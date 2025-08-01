@@ -42,9 +42,9 @@ func NewMapWindow(size int, wait time.Duration) Window {
 func (w *MapWindow) Put(request *TRequest) error {
 	w.mu.Lock()
 	err := w.put(request)
-	w.mu.Unlock()
-
 	// logDebug("[MapWindow] Put request, sequence: %d, ok: %v", request.Pdu.GetSequenceNumber(), err == nil)
+	// logDebug("[MapWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return err
 }
@@ -65,9 +65,9 @@ func (w *MapWindow) Take(sequence int32) *TRequest {
 	if ok {
 		delete(w.data, sequence)
 	}
-	w.mu.Unlock()
-
 	// logDebug("[MapWindow] Take request, sequence: %d, ok: %v", sequence, request != nil)
+	// logDebug("[MapWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return request
 }
@@ -83,9 +83,9 @@ func (w *MapWindow) TakeTimeout() []*TRequest {
 			requests = append(requests, request)
 		}
 	}
-	w.mu.Unlock()
-
 	// logDebug("[MapWindow] Take timeout requests, count: %d", len(requests))
+	// logDebug("[MapWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return requests
 }
@@ -116,9 +116,9 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 func (w *QueueWindow) Put(request *TRequest) error {
 	w.mu.Lock()
 	err := w.put(request)
-	w.mu.Unlock()
-
 	// logDebug("[QueueWindow] Put request, sequence: %d, ok: %v", request.Pdu.GetSequenceNumber(), err == nil)
+	// logDebug("[QueueWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return err
 }
@@ -142,9 +142,9 @@ func (w *QueueWindow) put(request *TRequest) error {
 func (w *QueueWindow) Take(sequence int32) *TRequest {
 	w.mu.Lock()
 	request := w.take(sequence)
-	w.mu.Unlock()
-
 	// logDebug("[QueueWindow] Take request, sequence: %d, ok: %v", sequence, request != nil)
+	// logDebug("[QueueWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return request
 }
@@ -181,9 +181,9 @@ func (w *QueueWindow) TakeTimeout() []*TRequest {
 		}
 		return false
 	})
-	w.mu.Unlock()
-
 	// logDebug("[QueueWindow] Take timeout requests, count: %d", len(list))
+	// logDebug("[QueueWindow] Data: %v", w.data)
+	w.mu.Unlock()
 
 	return list
 }
