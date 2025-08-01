@@ -11,6 +11,7 @@ var (
 	ErrBindFailed      = errors.New("bind failed")
 	ErrAuthFailed      = errors.New("auth failed")
 	ErrWindowFull      = errors.New("window full")
+	ErrNotAllowed      = errors.New("not allowed")
 	ErrSessionClosed   = errors.New("session closed")
 	ErrChannelClosed   = errors.New("channel closed")
 	ErrResponseTimeout = errors.New("response timeout")

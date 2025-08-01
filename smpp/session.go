@@ -138,10 +138,17 @@ func (s *Session) read() bool {
 		return true
 	}
 
+	if !s.allowRead(p) {
+		return false
+	}
+
 	switch p.(type) {
 	case *pdu.EnquireLink:
 		logDebug("[Session@%s:%s] Received enquire link pdu", s.id, s.SystemId())
 		s.writeToQueue(p.GetResponse(), SubmitterSys)
+		return false
+	case *pdu.EnquireLinkResp:
+		s.term.window.Take(p.GetSequenceNumber())
 		return false
 	case *pdu.Unbind:
 		logInfo("[Session@%s:%s] Received unbind pdu", s.id, s.SystemId())
@@ -152,14 +159,18 @@ func (s *Session) read() bool {
 		logInfo("[Session@%s:%s] Received unbind resp pdu", s.id, s.SystemId())
 		s.close(CloseByPdu, "received unbind response")
 		return true
+	case *pdu.BindRequest:
+		return false
+	case *pdu.AlertNotification:
+		s.onReceive(NewRRequest(s, p))
+		return false
 	case *pdu.GenericNack, *pdu.Outbind:
 		logInfo("[Session@%s:%s] Received generic nack or out bind pdu", s.id, s.SystemId())
 		s.close(CloseByPdu, "received unexpected pdu")
 		return true
-	case *pdu.BindRequest, *pdu.AlertNotification, *pdu.EnquireLinkResp:
-		return false
 	}
 
+	// AlertNotification, Outbind, GenericNack 这3类 pdu 没有对应的 resp
 	if p.CanResponse() {
 		rp := s.onReceive(NewRRequest(s, p))
 		if rp != nil {
@@ -235,6 +246,11 @@ func (s *Session) close(reason string, desc string) {
 	}()
 }
 
+func (s *Session) allowRead(p pdu.PDU) bool {
+	// todo 根据 session 角色和绑定类型限制可以接收哪些类型的 pdu
+	return true
+}
+
 func (s *Session) writeToQueue(p pdu.PDU, submitter int8) {
 	s.term.trChan <- s.newTRequest(p, submitter)
 }
@@ -305,11 +321,17 @@ func (s *Session) logLoopWriteStop() {
 }
 
 func (s *Session) write(request *TRequest) bool {
-	if request == nil || s.closed == 1 {
+	if request == nil {
+		return true
+	}
+
+	if s.closed == 1 {
+		s.onRespond(NewTResponse(s, request, nil, ErrSessionClosed))
 		return true
 	}
 
 	if !s.allowWrite(request.Pdu) {
+		s.onRespond(NewTResponse(s, request, nil, ErrNotAllowed))
 		return false
 	}
 
@@ -348,9 +370,7 @@ func (s *Session) allowWrite(p pdu.PDU) bool {
 	case *pdu.BindRequest, *pdu.Unbind, *pdu.Outbind, *pdu.GenericNack, *pdu.AlertNotification:
 		return false
 	}
-	if s.conn.BindType() == pdu.Transmitter {
-		return !p.CanResponse()
-	}
+	// todo 根据 session 角色和绑定类型限制可以提交哪些类型的 pdu
 	return true
 }
 
