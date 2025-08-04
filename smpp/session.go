@@ -471,3 +471,11 @@ func (s *Session) Close() {
 	atomic.StoreInt32(&s.closed, 1)
 	s.close(CloseByExplicit, "")
 }
+
+func (s *Session) Closed() bool {
+	return atomic.LoadInt32(&s.status) == SessionClosed
+}
+
+func (s *Session) ClosedExplicitly() bool {
+	return atomic.LoadInt32(&s.closed) == 1
+}
