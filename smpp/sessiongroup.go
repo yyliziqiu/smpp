@@ -19,11 +19,11 @@ type SessionGroup struct {
 }
 
 type SessionGroupConfig struct {
-	GroupId  string
-	Capacity int
-	AutoFill bool
-	Create   func() (*Session, error)
-	Failed   func(error)
+	GroupId  string                                // 会话组 ID
+	Capacity int                                   // 会话组大小
+	AutoFill bool                                  // 是否自动创建会话
+	Create   func(*SessionGroup) (*Session, error) // AutoFill 为 true 时，用来自动创建会话
+	Failed   func(*SessionGroup, error)            // 自动创建会话失败时执行
 }
 
 func NewSessionGroup(config *SessionGroupConfig) *SessionGroup {
@@ -31,6 +31,10 @@ func NewSessionGroup(config *SessionGroupConfig) *SessionGroup {
 		config:   config,
 		sessions: make(map[string]*Session),
 	}
+}
+
+func (g *SessionGroup) Id() string {
+	return g.config.GroupId
 }
 
 func (g *SessionGroup) Round() *Session {
@@ -83,6 +87,7 @@ func (g *SessionGroup) full() bool {
 func (g *SessionGroup) add(sess *Session) {
 	g.sessions[sess.Id()] = sess
 	g.keys = maps.Keys(g.sessions)
+	logInfo("[SessionGroup@%s] Add session, session id: %s", g.Id(), sess.Id())
 }
 
 func (g *SessionGroup) Del(sessionId string) {
@@ -105,6 +110,9 @@ func (g *SessionGroup) del(sessionId string) *Session {
 	if ok {
 		delete(g.sessions, sessionId)
 		g.keys = maps.Keys(g.sessions)
+		logInfo("[SessionGroup@%s] Del session, session id: %s", g.Id(), sess.Id())
+	} else {
+		logDebug("[SessionGroup@%s] Del not exit session, session id: %s", g.Id(), sessionId)
 	}
 	return sess
 }
@@ -144,14 +152,17 @@ func (g *SessionGroup) create() {
 		return
 	}
 
-	sess, err := g.config.Create()
+	sess, err := g.config.Create(g)
 	if err != nil {
 		failed := g.config.Failed
 		if failed != nil {
-			failed(err)
+			failed(g, err)
 		}
+		logWarn("[SessionGroup@%s] Create session failed, error: %v", g.Id(), err)
 		return
 	}
+
+	logInfo("[SessionGroup@%s] Create session, session id: %s", g.Id(), sess.Id())
 
 	g.add(sess)
 }
@@ -183,6 +194,8 @@ func (g *SessionGroup) Destroy() {
 	g.mu.Lock()
 	sessions := g.destroy()
 	g.mu.Unlock()
+
+	logInfo("[SessionGroup@%s] Destroy", g.Id())
 
 	for _, session := range sessions {
 		session.Close()

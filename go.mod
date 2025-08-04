@@ -6,6 +6,7 @@ require (
 	github.com/linxGnu/gosmpp v0.3.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/yyliziqiu/slib v1.0.35
+	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 )
 
 require (
