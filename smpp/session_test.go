@@ -48,6 +48,7 @@ func TestClientSession(t *testing.T) {
 	conf := SessionConfig{
 		EnquireLink: 60 * time.Second,
 		AttemptDial: 10 * time.Second,
+		Values:      "this is a test session",
 		OnReceive: func(request *RRequest, _ any) pdu.PDU {
 			logTest("received", request.Session.SystemId(), request.Pdu)
 			if request.Pdu.CanResponse() {
@@ -55,7 +56,8 @@ func TestClientSession(t *testing.T) {
 			}
 			return nil
 		},
-		OnRespond: func(response *TResponse, _ any) {
+		OnRespond: func(response *TResponse, values any) {
+			// fmt.Println("user custom data: ", values)
 			logTest("response", response.Request.SystemId, response.Pdu)
 		},
 		OnClosed: func(sess *Session, reason string, desc string, _ any) {
@@ -90,12 +92,15 @@ func TestServerSession(t *testing.T) {
 		panic(err)
 	}
 
+	fmt.Println("listen: ", listen.Addr())
+
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
 			t.Error(err)
 			continue
 		}
+		fmt.Println("accept: ", conn.RemoteAddr())
 		go accept(conn)
 	}
 }

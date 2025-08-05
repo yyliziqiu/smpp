@@ -40,7 +40,7 @@ func SessionGroupNewSession(group *SessionGroup) (*Session, error) {
 	conf := SessionConfig{
 		EnquireLink: 30 * time.Second,
 		AttemptDial: 10 * time.Second,
-		OnClosed: func(sess *Session, reason string, desc string) {
+		OnClosed: func(sess *Session, reason string, desc string, _ any) {
 			group.Del(sess.Id())
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
