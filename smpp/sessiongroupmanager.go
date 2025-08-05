@@ -9,9 +9,10 @@ import (
 )
 
 type SessionGroupManager struct {
-	config *SessionGroupManagerConfig
+	conf   *SessionGroupManagerConfig
 	groups map[string]*SessionGroup
 	adjust map[string]*SessionGroup
+	ch     chan *SessionGroup
 	mu     sync.RWMutex
 }
 
@@ -19,9 +20,9 @@ type SessionGroupManagerConfig struct {
 	AdjustInterval time.Duration
 }
 
-func NewSessionGroupManager(config SessionGroupManagerConfig) *SessionGroupManager {
+func NewSessionGroupManager(conf SessionGroupManagerConfig) *SessionGroupManager {
 	m := &SessionGroupManager{
-		config: &config,
+		conf:   &conf,
 		groups: make(map[string]*SessionGroup),
 		adjust: make(map[string]*SessionGroup),
 	}
@@ -32,7 +33,7 @@ func NewSessionGroupManager(config SessionGroupManagerConfig) *SessionGroupManag
 }
 
 func (m *SessionGroupManager) runAdjusts() {
-	ticker := time.NewTicker(m.config.AdjustInterval)
+	ticker := time.NewTicker(m.conf.AdjustInterval)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
@@ -48,22 +49,34 @@ func (m *SessionGroupManager) runAdjusts() {
 }
 
 func (m *SessionGroupManager) Register(conf SessionGroupConfig) error {
+	group, err := m.register(conf)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		group.Adjust()
+	}()
+
+	return nil
+}
+
+func (m *SessionGroupManager) register(conf SessionGroupConfig) (*SessionGroup, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if _, ok := m.groups[conf.GroupId]; ok {
-		return fmt.Errorf("group %s already exists", conf.GroupId)
+		return nil, fmt.Errorf("group %s already exists", conf.GroupId)
 	}
 
 	group := NewSessionGroup(&conf)
-	group.Adjust()
 
 	m.groups[conf.GroupId] = group
 	if conf.AutoFill {
 		m.adjust[conf.GroupId] = group
 	}
 
-	return nil
+	return group, nil
 }
 
 func (m *SessionGroupManager) Unregister(groupId string) {

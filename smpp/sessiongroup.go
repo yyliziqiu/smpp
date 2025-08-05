@@ -9,7 +9,7 @@ import (
 )
 
 type SessionGroup struct {
-	config    *SessionGroupConfig
+	conf      *SessionGroupConfig
 	sessions  map[string]*Session
 	keys      []string
 	round     int32
@@ -20,28 +20,40 @@ type SessionGroup struct {
 
 type SessionGroupConfig struct {
 	GroupId  string                                     // 会话组 ID
-	Capacity int                                        // 会话组大小
+	Capacity int                                        // 会话组中最大会话数量
 	AutoFill bool                                       // 是否自动创建会话
 	Values   any                                        // AutoFill 为 true 时，用来自定义用户数据
 	Create   func(*SessionGroup, any) (*Session, error) // AutoFill 为 true 时，用来自动创建会话
 	Failed   func(*SessionGroup, error)                 // AutoFill 为 true 时，自动创建会话失败时执行
 }
 
-func NewSessionGroup(config *SessionGroupConfig) *SessionGroup {
+func NewSessionGroup(conf *SessionGroupConfig) *SessionGroup {
 	return &SessionGroup{
-		config:   config,
+		conf:     conf,
 		sessions: make(map[string]*Session),
 	}
 }
 
+// Id 获取会话组 ID
 func (g *SessionGroup) Id() string {
-	return g.config.GroupId
+	return g.conf.GroupId
 }
 
+// Config 获取会话组配置
 func (g *SessionGroup) Config() *SessionGroupConfig {
-	return g.config
+	return g.conf
 }
 
+// Len 获取会话组中的会话数量
+func (g *SessionGroup) Len() int {
+	return g.len()
+}
+
+func (g *SessionGroup) len() int {
+	return len(g.keys)
+}
+
+// Round 轮询获取会话组中的会话
 func (g *SessionGroup) Round() *Session {
 	var sess *Session
 
@@ -56,10 +68,7 @@ func (g *SessionGroup) Round() *Session {
 	return sess
 }
 
-func (g *SessionGroup) len() int {
-	return len(g.keys)
-}
-
+// Get 获取会话组中指定会话
 func (g *SessionGroup) Get(sessionId string) *Session {
 	g.mu.RLock()
 	sess := g.sessions[sessionId]
@@ -68,6 +77,7 @@ func (g *SessionGroup) Get(sessionId string) *Session {
 	return sess
 }
 
+// All 获取会话组所有会话
 func (g *SessionGroup) All() []*Session {
 	g.mu.RLock()
 	list := maps.Values(g.sessions)
@@ -76,6 +86,7 @@ func (g *SessionGroup) All() []*Session {
 	return list
 }
 
+// Add 向会话组中添加一个会话
 func (g *SessionGroup) Add(sess *Session) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -94,7 +105,7 @@ func (g *SessionGroup) Add(sess *Session) error {
 }
 
 func (g *SessionGroup) full() bool {
-	return len(g.keys) >= g.config.Capacity
+	return len(g.keys) >= g.conf.Capacity
 }
 
 func (g *SessionGroup) add(sess *Session) {
@@ -103,6 +114,7 @@ func (g *SessionGroup) add(sess *Session) {
 	logInfo("[SessionGroup@%s] Add session, session id: %s", g.Id(), sess.Id())
 }
 
+// Del 从会话组中删除一个会话
 func (g *SessionGroup) Del(sessionId string) {
 	var sess *Session
 
@@ -130,8 +142,9 @@ func (g *SessionGroup) del(sessionId string) *Session {
 	return sess
 }
 
+// Adjust 调整会话组中的会话数量
 func (g *SessionGroup) Adjust() {
-	if !g.config.AutoFill || g.destroyed {
+	if g.destroyed {
 		return
 	}
 
@@ -140,11 +153,13 @@ func (g *SessionGroup) Adjust() {
 	}
 
 	g.mu.RLock()
-	diff := g.config.Capacity - g.len()
+	diff := g.conf.Capacity - g.len()
 	g.mu.RUnlock()
 
-	for i := 0; i < diff; i++ {
-		g.create()
+	if g.conf.AutoFill {
+		for i := 0; i < diff; i++ {
+			g.create()
+		}
 	}
 
 	for i := diff; i < 0; i++ {
@@ -165,11 +180,10 @@ func (g *SessionGroup) create() {
 		return
 	}
 
-	sess, err := g.config.Create(g, g.config.Values)
+	sess, err := g.conf.Create(g, g.conf.Values)
 	if err != nil {
-		failed := g.config.Failed
-		if failed != nil {
-			failed(g, err)
+		if g.conf.Failed != nil {
+			g.conf.Failed(g, err)
 		}
 		logWarn("[SessionGroup@%s] Create session failed, error: %v", g.Id(), err)
 		return
@@ -195,27 +209,26 @@ func (g *SessionGroup) empty() bool {
 	return len(g.keys) == 0
 }
 
+// Capacity 设置会话组最大会话数
 func (g *SessionGroup) Capacity(n int) {
 	g.mu.Lock()
-	g.config.Capacity = n
+	g.conf.Capacity = n
 	g.mu.Unlock()
-
 	g.Adjust()
 }
 
+// Destroy 销毁会话组，并关闭会话组中的所有会话
 func (g *SessionGroup) Destroy() {
-	g.mu.Lock()
-	sessions := g.destroy()
-	g.mu.Unlock()
-
-	logInfo("[SessionGroup@%s] Destroy", g.Id())
-
-	for _, session := range sessions {
+	for _, session := range g.destroy() {
 		session.Close()
 	}
+	logInfo("[SessionGroup@%s] Destroy", g.Id())
 }
 
 func (g *SessionGroup) destroy() []*Session {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	if g.destroyed {
 		return nil
 	}
