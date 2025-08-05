@@ -19,11 +19,12 @@ type SessionGroup struct {
 }
 
 type SessionGroupConfig struct {
-	GroupId  string                                // 会话组 ID
-	Capacity int                                   // 会话组大小
-	AutoFill bool                                  // 是否自动创建会话
-	Create   func(*SessionGroup) (*Session, error) // AutoFill 为 true 时，用来自动创建会话
-	Failed   func(*SessionGroup, error)            // 自动创建会话失败时执行
+	GroupId  string                                     // 会话组 ID
+	Capacity int                                        // 会话组大小
+	AutoFill bool                                       // 是否自动创建会话
+	Values   any                                        // AutoFill 为 true 时，用来自定义用户数据
+	Create   func(*SessionGroup, any) (*Session, error) // AutoFill 为 true 时，用来自动创建会话
+	Failed   func(*SessionGroup, error)                 // AutoFill 为 true 时，自动创建会话失败时执行
 }
 
 func NewSessionGroup(config *SessionGroupConfig) *SessionGroup {
@@ -35,6 +36,10 @@ func NewSessionGroup(config *SessionGroupConfig) *SessionGroup {
 
 func (g *SessionGroup) Id() string {
 	return g.config.GroupId
+}
+
+func (g *SessionGroup) Config() *SessionGroupConfig {
+	return g.config
 }
 
 func (g *SessionGroup) Round() *Session {
@@ -61,6 +66,14 @@ func (g *SessionGroup) Get(sessionId string) *Session {
 	g.mu.RUnlock()
 
 	return sess
+}
+
+func (g *SessionGroup) All() []*Session {
+	g.mu.RLock()
+	list := maps.Values(g.sessions)
+	g.mu.RUnlock()
+
+	return list
 }
 
 func (g *SessionGroup) Add(sess *Session) error {
@@ -152,7 +165,7 @@ func (g *SessionGroup) create() {
 		return
 	}
 
-	sess, err := g.config.Create(g)
+	sess, err := g.config.Create(g, g.config.Values)
 	if err != nil {
 		failed := g.config.Failed
 		if failed != nil {

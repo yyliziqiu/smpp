@@ -11,8 +11,9 @@ func TestSessionGroup(t *testing.T) {
 		GroupId:  "group1",
 		Capacity: 3,
 		AutoFill: true,
-		Create: func(group *SessionGroup) (*Session, error) {
-			fmt.Println("create session")
+		Values:   "test group1",
+		Create: func(group *SessionGroup, val any) (*Session, error) {
+			fmt.Println("create session: ", val)
 			return SessionGroupNewSession(group)
 		},
 		Failed: func(group *SessionGroup, err error) {
@@ -21,16 +22,18 @@ func TestSessionGroup(t *testing.T) {
 	})
 
 	group.Adjust()
-
 	fmt.Println("group len: ", group.len())
 
 	if group.len() > 0 {
 		group.Del(group.keys[0])
 	}
-
 	fmt.Println("group len: ", group.len())
 
-	time.Sleep(time.Hour)
+	time.Sleep(3 * time.Second)
+	group.Destroy()
+	fmt.Println("group len: ", group.len())
+
+	time.Sleep(3 * time.Second)
 }
 
 func SessionGroupNewSession(group *SessionGroup) (*Session, error) {
@@ -44,4 +47,35 @@ func SessionGroupNewSession(group *SessionGroup) (*Session, error) {
 	}
 
 	return NewSession(NewClientConnection(_clientConnectionConfig), conf)
+}
+
+func TestSessionGroup2(t *testing.T) {
+	group := NewSessionGroup(&SessionGroupConfig{
+		GroupId:  "group2",
+		Capacity: 3,
+	})
+
+	for i := 0; i < 5; i++ {
+		sess, err := SessionGroupNewSession(group)
+		if err != nil {
+			t.Log("Error: ", err)
+			continue
+		}
+		err = group.Add(sess)
+		if err != nil {
+			t.Log("Error: ", err)
+		}
+	}
+
+	time.Sleep(3 * time.Second)
+	if group.len() > 0 {
+		group.Del(group.keys[0])
+	}
+	fmt.Println("group len: ", group.len())
+
+	time.Sleep(3 * time.Second)
+	group.Destroy()
+	fmt.Println("group len: ", group.len())
+
+	time.Sleep(3 * time.Second)
 }
