@@ -13,6 +13,10 @@
 
 * [gosmpp](https://github.com/linxGnu/gosmpp)
 
+## Install
+
+`go get github.com/yyliziqiu/smpp`
+
 ## Example
 
 > [more examples](https://github.com/yyliziqiu/smpp/tree/master/example)
