@@ -30,6 +30,8 @@ func StartClient() {
 		EnquireLink: 60 * time.Second,
 		// redial interval, session will auto redial when the tcp connection is broke if the AttemptDial > 0
 		AttemptDial: 5 * time.Second,
+		// user custom data
+		Values: "user data",
 		// the interval duration that clear the timeout request in the window
 		// WindowClear: 10 * time.Second,
 		// when the window size is large or request timeout is small, set the WindowType = 1
@@ -39,14 +41,14 @@ func StartClient() {
 		// timeout of request in the window
 		// WindowWait: 300 * time.Second,
 		// invoked when received the non-responsive pdu
-		OnReceive: func(request *smpp.RRequest) pdu.PDU {
+		OnReceive: func(request *smpp.RRequest, _ any) pdu.PDU {
 			if request.Pdu.CanResponse() {
 				return request.Pdu.GetResponse()
 			}
 			return nil
 		},
 		// invoked before submit the pdu, you can get an auto-assigned message id of the submitted pdu
-		OnRequest: func(request *smpp.TRequest) {
+		OnRequest: func(request *smpp.TRequest, _ any) {
 			_ = request.MessageId
 		},
 		// invoked when received the responsive pdu
@@ -54,11 +56,11 @@ func StartClient() {
 		// or wait the response of pdu timeout
 		//
 		// the TResponse.Pdu must be nil if the TResponse.Error is not nil
-		OnRespond: func(response *smpp.TResponse) {
+		OnRespond: func(response *smpp.TResponse, _ any) {
 
 		},
 		// invoked after the session is closed
-		OnClosed: func(sess *smpp.Session, reason string, desc string) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}

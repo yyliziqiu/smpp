@@ -48,17 +48,17 @@ func TestClientSession(t *testing.T) {
 	conf := SessionConfig{
 		EnquireLink: 60 * time.Second,
 		AttemptDial: 10 * time.Second,
-		OnReceive: func(request *RRequest) pdu.PDU {
+		OnReceive: func(request *RRequest, _ any) pdu.PDU {
 			logTest("received", request.Session.SystemId(), request.Pdu)
 			if request.Pdu.CanResponse() {
 				return request.Pdu.GetResponse()
 			}
 			return nil
 		},
-		OnRespond: func(response *TResponse) {
+		OnRespond: func(response *TResponse, _ any) {
 			logTest("response", response.Request.SystemId, response.Pdu)
 		},
-		OnClosed: func(sess *Session, reason string, desc string) {
+		OnClosed: func(sess *Session, reason string, desc string, _ any) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}
@@ -104,7 +104,7 @@ func accept(conn net.Conn) {
 	connect := NewServerConnection(conn, _serverConnectionConfig)
 
 	conf := SessionConfig{
-		OnReceive: func(request *RRequest) pdu.PDU {
+		OnReceive: func(request *RRequest, _ any) pdu.PDU {
 			logTest("received", request.Session.SystemId(), request.Pdu)
 			switch request.Pdu.(type) {
 			case *pdu.SubmitSM:
@@ -117,10 +117,10 @@ func accept(conn net.Conn) {
 			}
 			return nil
 		},
-		OnRespond: func(response *TResponse) {
+		OnRespond: func(response *TResponse, _ any) {
 			logTest("response", response.Request.SystemId, response.Pdu)
 		},
-		OnClosed: func(sess *Session, reason string, desc string) {
+		OnClosed: func(sess *Session, reason string, desc string, _ any) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}

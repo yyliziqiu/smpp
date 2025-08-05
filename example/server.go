@@ -41,7 +41,7 @@ func accept(conn net.Conn) {
 
 	// set session config
 	conf := smpp.SessionConfig{
-		OnReceive: func(request *smpp.RRequest) pdu.PDU {
+		OnReceive: func(request *smpp.RRequest, _ any) pdu.PDU {
 			switch request.Pdu.(type) {
 			case *pdu.SubmitSM:
 				p := request.Pdu.GetResponse().(*pdu.SubmitSMResp)
@@ -53,10 +53,10 @@ func accept(conn net.Conn) {
 			}
 			return nil
 		},
-		OnRespond: func(response *smpp.TResponse) {
+		OnRespond: func(response *smpp.TResponse, _ any) {
 
 		},
-		OnClosed: func(sess *smpp.Session, reason string, desc string) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
 
 		},
 	}

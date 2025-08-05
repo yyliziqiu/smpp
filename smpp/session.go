@@ -33,17 +33,18 @@ type SessionTerm struct {
 }
 
 type SessionConfig struct {
-	EnquireLink time.Duration                  // 心跳间隔
-	AttemptDial time.Duration                  // 重连间隔
-	WindowClear time.Duration                  // 清理窗口内超时请求的时间间隔
-	WindowType  int                            // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
-	WindowSize  int                            // 窗口大小
-	WindowWait  time.Duration                  // 超时时间
-	OnReceive   func(*RRequest) pdu.PDU        // 接收到对端非响应 pdu 时执行
-	OnRequest   func(*TRequest)                // 向对端提交 pdu 时执行
-	OnRespond   func(*TResponse)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
-	OnCreated   func(*Session)                 // 创建会话时执行
-	OnClosed    func(*Session, string, string) // 关闭会话时执行
+	EnquireLink time.Duration                       // 心跳间隔
+	AttemptDial time.Duration                       // 重连间隔
+	Values      any                                 // 用户自定义数据
+	WindowClear time.Duration                       // 清理窗口内超时请求的时间间隔
+	WindowType  int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
+	WindowSize  int                                 // 窗口大小
+	WindowWait  time.Duration                       // 超时时间
+	OnReceive   func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
+	OnRequest   func(*TRequest, any)                // 向对端提交 pdu 时执行
+	OnRespond   func(*TResponse, any)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
+	OnCreated   func(*Session, any)                 // 创建会话时执行
+	OnClosed    func(*Session, string, string, any) // 关闭会话时执行
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
@@ -73,7 +74,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		return nil, err
 	}
 
-	s.onCreated()
+	s.onCreated(s.values())
 
 	return s, nil
 }
@@ -110,6 +111,10 @@ func (s *Session) dial() error {
 	logInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
 
 	return nil
+}
+
+func (s *Session) values() any {
+	return s.conf.Values
 }
 
 func (s *Session) loopRead() {
@@ -162,7 +167,7 @@ func (s *Session) read() bool {
 	case *pdu.BindRequest:
 		return false
 	case *pdu.AlertNotification:
-		s.onReceive(NewRRequest(s, p))
+		s.onReceive(NewRRequest(s, p), s.values())
 		return false
 	case *pdu.GenericNack, *pdu.Outbind:
 		logInfo("[Session@%s:%s] Received generic nack or out bind pdu", s.id, s.SystemId())
@@ -172,14 +177,14 @@ func (s *Session) read() bool {
 
 	// AlertNotification, Outbind, GenericNack 这3类 pdu 没有对应的 resp
 	if p.CanResponse() {
-		rp := s.onReceive(NewRRequest(s, p))
+		rp := s.onReceive(NewRRequest(s, p), s.values())
 		if rp != nil {
 			s.writeToQueue(rp, SubmitterSys)
 		}
 	} else {
 		tr := s.term.window.Take(p.GetSequenceNumber())
 		if tr != nil {
-			s.onRespond(NewTResponse(s, tr, p, nil))
+			s.onRespond(NewTResponse(s, tr, p, nil), s.values())
 		}
 	}
 
@@ -209,7 +214,7 @@ func (s *Session) close(reason string, desc string) {
 		// 清理会话数据
 		close(s.term.trChan)
 		for request := range s.term.trChan {
-			s.onRespond(NewTResponse(s, request, nil, ErrChannelClosed))
+			s.onRespond(NewTResponse(s, request, nil, ErrChannelClosed), s.values())
 		}
 		s.term.window = nil
 
@@ -218,7 +223,7 @@ func (s *Session) close(reason string, desc string) {
 		// 结束会话
 		closed := s.conf.AttemptDial == 0 || reason == CloseByExplicit
 		if closed {
-			s.onClosed(reason, desc)
+			s.onClosed(reason, desc, s.values())
 			return
 		}
 
@@ -231,7 +236,7 @@ func (s *Session) close(reason string, desc string) {
 			<-ticker.C
 			if atomic.LoadInt32(&s.closed) == 1 {
 				logInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
-				s.onClosed(CloseByExplicit, "")
+				s.onClosed(CloseByExplicit, "", s.values())
 				return
 			}
 			err := s.dial()
@@ -326,23 +331,23 @@ func (s *Session) write(request *TRequest) bool {
 	}
 
 	if s.closed == 1 {
-		s.onRespond(NewTResponse(s, request, nil, ErrSessionClosed))
+		s.onRespond(NewTResponse(s, request, nil, ErrSessionClosed), s.values())
 		return true
 	}
 
 	if !s.allowWrite(request.Pdu) {
-		s.onRespond(NewTResponse(s, request, nil, ErrNotAllowed))
+		s.onRespond(NewTResponse(s, request, nil, ErrNotAllowed), s.values())
 		return false
 	}
 
 	request.SubmitAt = time.Now().Unix()
-	s.onRequest(request)
+	s.onRequest(request, s.values())
 
 	if request.Pdu.CanResponse() {
 		err := s.term.window.Put(request)
 		if err != nil {
 			logWarn("[Session@%s:%s] Put request to window failed, error: %v", s.id, s.SystemId(), err)
-			s.onRespond(NewTResponse(s, request, nil, err))
+			s.onRespond(NewTResponse(s, request, nil, err), s.values())
 			return false
 		}
 	}
@@ -350,7 +355,7 @@ func (s *Session) write(request *TRequest) bool {
 	n, err := s.conn.Write(request.Pdu)
 	if err != nil {
 		logWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
-		s.onRespond(NewTResponse(s, request, nil, err))
+		s.onRespond(NewTResponse(s, request, nil, err), s.values())
 		if n > 0 {
 			s.close(CloseByError, err.Error())
 			return true
@@ -390,7 +395,7 @@ func (s *Session) loopWindow() {
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
-					s.onRespond(NewTResponse(s, request, nil, ErrResponseTimeout))
+					s.onRespond(NewTResponse(s, request, nil, ErrResponseTimeout), s.values())
 				}
 				logDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
 			}
@@ -398,36 +403,36 @@ func (s *Session) loopWindow() {
 	}()
 }
 
-func (s *Session) onReceive(request *RRequest) pdu.PDU {
+func (s *Session) onReceive(request *RRequest, values any) pdu.PDU {
 	if s.conf.OnReceive != nil {
-		return s.conf.OnReceive(request)
+		return s.conf.OnReceive(request, values)
 	}
 	return nil
 }
 
-func (s *Session) onRequest(request *TRequest) {
+func (s *Session) onRequest(request *TRequest, values any) {
 	if s.conf.OnRequest != nil && request.submitter == SubmitterUser {
-		s.conf.OnRequest(request)
+		s.conf.OnRequest(request, values)
 	}
 }
 
-func (s *Session) onRespond(response *TResponse) {
+func (s *Session) onRespond(response *TResponse, values any) {
 	if s.conf.OnRespond != nil && response.Request.submitter == SubmitterUser {
-		s.conf.OnRespond(response)
+		s.conf.OnRespond(response, values)
 	}
 }
 
-func (s *Session) onCreated() {
+func (s *Session) onCreated(values any) {
 	s.tracer.AddSession(s)
 	if s.conf.OnCreated != nil {
-		s.conf.OnCreated(s)
+		s.conf.OnCreated(s, values)
 	}
 }
 
-func (s *Session) onClosed(reason string, desc string) {
+func (s *Session) onClosed(reason string, desc string, values any) {
 	s.tracer.DelSession(s.id)
 	if s.conf.OnClosed != nil {
-		s.conf.OnClosed(s, reason, desc)
+		s.conf.OnClosed(s, reason, desc, values)
 	}
 }
 
