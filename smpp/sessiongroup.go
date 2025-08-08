@@ -173,13 +173,6 @@ func (g *SessionGroup) Adjust() {
 }
 
 func (g *SessionGroup) create() {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if g.full() || g.destroyed {
-		return
-	}
-
 	sess, err := g.conf.Create(g, g.conf.Values)
 	if err != nil {
 		if g.conf.Failed != nil {
@@ -188,10 +181,22 @@ func (g *SessionGroup) create() {
 		logWarn("[SessionGroup@%s] Create session failed, error: %v", g.Id(), err)
 		return
 	}
-
 	logInfo("[SessionGroup@%s] Create session, session id: %s", g.Id(), sess.Id())
 
-	g.add(sess)
+	closed := false
+	g.mu.Lock()
+	if g.full() || g.destroyed {
+		closed = true
+	} else {
+		g.add(sess)
+	}
+	g.mu.Unlock()
+
+	if closed {
+		sess.Close()
+		logInfo("[SessionGroup@%s] Close session in create, session id: %s", g.Id(), sess.Id())
+		return
+	}
 }
 
 func (g *SessionGroup) remove() *Session {
