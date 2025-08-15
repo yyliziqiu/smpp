@@ -33,18 +33,19 @@ type SessionTerm struct {
 }
 
 type SessionConfig struct {
-	EnquireLink time.Duration                       // 心跳间隔
-	AttemptDial time.Duration                       // 重连间隔
-	Values      any                                 // 用户自定义数据
-	WindowClear time.Duration                       // 清理窗口内超时请求的时间间隔
-	WindowType  int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
-	WindowSize  int                                 // 窗口大小
-	WindowWait  time.Duration                       // 超时时间
-	OnReceive   func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
-	OnRequest   func(*TRequest, any)                // 向对端提交 pdu 时执行
-	OnRespond   func(*TResponse, any)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
-	OnCreated   func(*Session, any)                 // 创建会话时执行
-	OnClosed    func(*Session, string, string, any) // 关闭会话时执行
+	EnquireLink  time.Duration                       // 心跳间隔
+	AttemptDial  time.Duration                       // 重连间隔
+	Values       any                                 // 用户自定义数据
+	WindowClear  time.Duration                       // 清理窗口内超时请求的时间间隔
+	WindowType   int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
+	WindowSize   int                                 // 窗口大小
+	WindowWait   time.Duration                       // 超时时间
+	CreateWindow func(string) Window                 // 根据 system id 创建窗口
+	OnReceive    func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
+	OnRequest    func(*TRequest, any)                // 向对端提交 pdu 时执行
+	OnRespond    func(*TResponse, any)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
+	OnCreated    func(*Session, any)                 // 创建会话时执行
+	OnClosed     func(*Session, string, string, any) // 关闭会话时执行
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
@@ -95,7 +96,7 @@ func (s *Session) dial() error {
 		wg:     sync.WaitGroup{},
 		ctx:    ctx,
 		cancel: cancel,
-		window: createWindow(s.conf.WindowType, s.conf.WindowSize, s.conf.WindowWait),
+		window: s.createWindow(),
 		trChan: make(chan *TRequest, 1),
 		dialAt: time.Now(),
 	}
@@ -111,6 +112,19 @@ func (s *Session) dial() error {
 	logInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
 
 	return nil
+}
+
+func (s *Session) createWindow() Window {
+	if s.conf.CreateWindow != nil {
+		return s.conf.CreateWindow(s.SystemId())
+	}
+
+	switch s.conf.WindowType {
+	case 1:
+		return NewQueueWindow(s.conf.WindowSize, s.conf.WindowWait)
+	default:
+		return NewMapWindow(s.conf.WindowSize, s.conf.WindowWait)
+	}
 }
 
 func (s *Session) values() any {

@@ -13,15 +13,6 @@ type Window interface {
 	TakeTimeout() []*TRequest
 }
 
-func createWindow(typ int, size int, wait time.Duration) Window {
-	switch typ {
-	case 1:
-		return NewQueueWindow(size, wait)
-	default:
-		return NewMapWindow(size, wait)
-	}
-}
-
 // ============ MapWindow ============
 
 type MapWindow struct {
