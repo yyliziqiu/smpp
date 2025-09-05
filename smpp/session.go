@@ -33,19 +33,19 @@ type SessionTerm struct {
 }
 
 type SessionConfig struct {
-	EnquireLink  time.Duration                       // 心跳间隔
-	AttemptDial  time.Duration                       // 重连间隔
-	Values       any                                 // 用户自定义数据
-	WindowClear  time.Duration                       // 清理窗口内超时请求的时间间隔
-	WindowType   int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
-	WindowSize   int                                 // 窗口大小
-	WindowWait   time.Duration                       // 超时时间
-	CreateWindow func(string) Window                 // 根据 system id 创建窗口
-	OnReceive    func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
-	OnRequest    func(*TRequest, any)                // 向对端提交 pdu 时执行
-	OnRespond    func(*TResponse, any)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
-	OnCreated    func(*Session, any)                 // 创建会话时执行
-	OnClosed     func(*Session, string, string, any) // 关闭会话时执行
+	EnquireLink    time.Duration                       // 心跳间隔
+	AttemptDial    time.Duration                       // 重连间隔
+	WindowClear    time.Duration                       // 清理窗口内超时请求的时间间隔
+	WindowType     int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
+	WindowSize     int                                 // 窗口大小
+	WindowWait     time.Duration                       // 超时时间
+	CustomData     any                                 // 自定义数据
+	OnCreateWindow func(string, any) Window            // 根据 system id 创建窗口
+	OnReceive      func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
+	OnRequest      func(*TRequest, any)                // 向对端提交 pdu 时执行
+	OnRespond      func(*TResponse, any)               // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
+	OnCreated      func(*Session, any)                 // 创建会话时执行
+	OnClosed       func(*Session, string, string, any) // 关闭会话时执行
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
@@ -75,7 +75,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		return nil, err
 	}
 
-	s.onCreated(s.values())
+	s.onCreated(s.customData())
 
 	return s, nil
 }
@@ -115,8 +115,8 @@ func (s *Session) dial() error {
 }
 
 func (s *Session) createWindow() Window {
-	if s.conf.CreateWindow != nil {
-		return s.conf.CreateWindow(s.SystemId())
+	if s.conf.OnCreateWindow != nil {
+		return s.conf.OnCreateWindow(s.SystemId(), s.customData())
 	}
 
 	switch s.conf.WindowType {
@@ -127,8 +127,8 @@ func (s *Session) createWindow() Window {
 	}
 }
 
-func (s *Session) values() any {
-	return s.conf.Values
+func (s *Session) customData() any {
+	return s.conf.CustomData
 }
 
 func (s *Session) loopRead() {
@@ -181,7 +181,7 @@ func (s *Session) read() bool {
 	case *pdu.BindRequest:
 		return false
 	case *pdu.AlertNotification:
-		s.onReceive(NewRRequest(s, p), s.values())
+		s.onReceive(NewRRequest(s, p), s.customData())
 		return false
 	case *pdu.GenericNack, *pdu.Outbind:
 		logInfo("[Session@%s:%s] Received generic nack or out bind pdu", s.id, s.SystemId())
@@ -191,14 +191,14 @@ func (s *Session) read() bool {
 
 	// AlertNotification, Outbind, GenericNack 这3类 pdu 没有对应的 resp
 	if p.CanResponse() {
-		rp := s.onReceive(NewRRequest(s, p), s.values())
+		rp := s.onReceive(NewRRequest(s, p), s.customData())
 		if rp != nil {
 			s.writeToQueue(rp, SubmitterSys)
 		}
 	} else {
 		tr := s.term.window.Take(p.GetSequenceNumber())
 		if tr != nil {
-			s.onRespond(NewTResponse(s, tr, p, nil), s.values())
+			s.onRespond(NewTResponse(s, tr, p, nil), s.customData())
 		}
 	}
 
@@ -228,7 +228,7 @@ func (s *Session) close(reason string, desc string) {
 		// 清理会话数据
 		close(s.term.trChan)
 		for request := range s.term.trChan {
-			s.onRespond(NewTResponse(s, request, nil, ErrChannelClosed), s.values())
+			s.onRespond(NewTResponse(s, request, nil, ErrChannelClosed), s.customData())
 		}
 		s.term.window = nil
 
@@ -237,7 +237,7 @@ func (s *Session) close(reason string, desc string) {
 		// 结束会话
 		closed := s.conf.AttemptDial == 0 || reason == CloseByExplicit
 		if closed {
-			s.onClosed(reason, desc, s.values())
+			s.onClosed(reason, desc, s.customData())
 			return
 		}
 
@@ -250,7 +250,7 @@ func (s *Session) close(reason string, desc string) {
 			<-ticker.C
 			if atomic.LoadInt32(&s.closed) == 1 {
 				logInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
-				s.onClosed(CloseByExplicit, "", s.values())
+				s.onClosed(CloseByExplicit, "", s.customData())
 				return
 			}
 			err := s.dial()
@@ -345,23 +345,23 @@ func (s *Session) write(request *TRequest) bool {
 	}
 
 	if s.closed == 1 {
-		s.onRespond(NewTResponse(s, request, nil, ErrSessionClosed), s.values())
+		s.onRespond(NewTResponse(s, request, nil, ErrSessionClosed), s.customData())
 		return true
 	}
 
 	if !s.allowWrite(request.Pdu) {
-		s.onRespond(NewTResponse(s, request, nil, ErrNotAllowed), s.values())
+		s.onRespond(NewTResponse(s, request, nil, ErrNotAllowed), s.customData())
 		return false
 	}
 
 	request.SubmitAt = time.Now().Unix()
-	s.onRequest(request, s.values())
+	s.onRequest(request, s.customData())
 
 	if request.Pdu.CanResponse() {
 		err := s.term.window.Put(request)
 		if err != nil {
 			logWarn("[Session@%s:%s] Put request to window failed, error: %v", s.id, s.SystemId(), err)
-			s.onRespond(NewTResponse(s, request, nil, err), s.values())
+			s.onRespond(NewTResponse(s, request, nil, err), s.customData())
 			return false
 		}
 	}
@@ -369,7 +369,7 @@ func (s *Session) write(request *TRequest) bool {
 	n, err := s.conn.Write(request.Pdu)
 	if err != nil {
 		logWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
-		s.onRespond(NewTResponse(s, request, nil, err), s.values())
+		s.onRespond(NewTResponse(s, request, nil, err), s.customData())
 		if n > 0 {
 			s.close(CloseByError, err.Error())
 			return true
@@ -409,7 +409,7 @@ func (s *Session) loopWindow() {
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
-					s.onRespond(NewTResponse(s, request, nil, ErrResponseTimeout), s.values())
+					s.onRespond(NewTResponse(s, request, nil, ErrResponseTimeout), s.customData())
 				}
 				logDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
 			}

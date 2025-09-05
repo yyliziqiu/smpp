@@ -48,7 +48,7 @@ func TestClientSession(t *testing.T) {
 	conf := SessionConfig{
 		EnquireLink: 60 * time.Second,
 		AttemptDial: 10 * time.Second,
-		Values:      "this is a test session",
+		CustomData:  "this is a test session",
 		OnReceive: func(request *RRequest, _ any) pdu.PDU {
 			logTest("received", request.Session.SystemId(), request.Pdu)
 			if request.Pdu.CanResponse() {

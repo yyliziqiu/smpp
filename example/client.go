@@ -31,7 +31,7 @@ func StartClient() {
 		// redial interval, session will auto redial when the tcp connection is broke if the AttemptDial > 0
 		AttemptDial: 5 * time.Second,
 		// user custom data
-		Values: "user data",
+		CustomData: "user data",
 		// the interval duration that clear the timeout request in the window
 		// WindowClear: 10 * time.Second,
 		// when the window size is large or request timeout is small, set the WindowType = 1
