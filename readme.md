@@ -204,7 +204,7 @@ func accept(conn net.Conn) {
 }
 
 func newDeliverSm() *pdu.DeliverSM {
-	receipt := smpp.Receipt{
+	dlr := smpp.Dlr{
 		Id:    suid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
@@ -214,6 +214,6 @@ func newDeliverSm() *pdu.DeliverSM {
 		Err:   "000",
 		Text:  "success",
 	}
-	return receipt.Pdu("6281339900520", "matrix")
+	return dlr.Pdu("6281339900520", "matrix")
 }
 ```

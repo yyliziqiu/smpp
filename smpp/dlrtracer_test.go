@@ -12,18 +12,18 @@ import (
 	"github.com/yyliziqiu/slib/suid"
 )
 
-func TestReceiptTracer(t *testing.T) {
+func TestDlrTracer(t *testing.T) {
 	put := 1000000
 	size := 1000000
 	wait := 20 * time.Second
 
-	w := &ReceiptTracer{
-		data: make(map[string]*ReceiptTo, size),
-		heap: make(ReceiptHeap, 0, size),
+	w := &DlrTracer{
+		data: make(map[string]*DlrEntry, size),
+		heap: make(DlrHeap, 0, size),
 	}
 
 	for i := 0; i < put; i++ {
-		w.Put(&ReceiptTo{
+		w.Put(&DlrEntry{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
@@ -71,11 +71,11 @@ func TestReceiptTracer(t *testing.T) {
 	printMemory("clear all", true)
 }
 
-func TestReceiptTracerSnap(t *testing.T) {
-	w := NewReceiptTracerWithSnap(10, "/private/ws/self/smpp/data")
+func TestNewDlrTracer2(t *testing.T) {
+	w := NewDlrTracer2(10, "/private/ws/self/smpp/data")
 
 	for i := 0; i < 3; i++ {
-		w.Put(&ReceiptTo{
+		w.Put(&DlrEntry{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(i),
@@ -87,7 +87,7 @@ func TestReceiptTracerSnap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w = NewReceiptTracerWithSnap(10, "/private/ws/self/smpp/data")
+	w = NewDlrTracer2(10, "/private/ws/self/smpp/data")
 
 	err = w.Load()
 	if err != nil {

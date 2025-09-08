@@ -10,24 +10,24 @@ import (
 	"github.com/yyliziqiu/smpp/smpp"
 )
 
-func StartReceiptTracer() {
+func StartDlrTracer() {
 	size := 1000
 	wait := time.Minute
 
 	// create a tracer
-	w := smpp.NewReceiptTracer(size)
+	t := smpp.NewDlrTracer(size)
 
-	// put the message id to tracer for receipt trace
-	w.Put(&smpp.ReceiptTo{
+	// put the message id to tracer for dlr trace
+	t.Put(&smpp.DlrEntry{
 		MessageId: suid.Get(),
 		SystemId:  "user1",
 		ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 	})
 
-	// take the session by message id to send receipt to client
-	_ = w.Take("message id")
+	// take the session by message id to send dlr to client
+	_ = t.Take("message id")
 
-	// handle the timeout message when wait receipt
+	// handle the timeout message when wait dlr
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -38,7 +38,7 @@ func StartReceiptTracer() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_ = w.TakeTimeout()
+				_ = t.TakeTimeout()
 			}
 		}
 	}()

@@ -20,7 +20,7 @@ func newTestSubmitSM() *pdu.SubmitSM {
 }
 
 func newTestDeliverSM() *pdu.DeliverSM {
-	receipt := Receipt{
+	dlr := Dlr{
 		Id:    suid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
@@ -30,7 +30,7 @@ func newTestDeliverSM() *pdu.DeliverSM {
 		Err:   "000",
 		Text:  "success",
 	}
-	return receipt.Pdu("6281339900520", "matrix")
+	return dlr.Pdu("6281339900520", "matrix")
 }
 
 func logTest(tag string, systemId string, p pdu.PDU) {
