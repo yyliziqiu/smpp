@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/sq"
+	"github.com/yyliziqiu/slib/scq2"
 	"github.com/yyliziqiu/slib/stime"
 )
 
@@ -20,7 +20,7 @@ func TestQueueWindow(t *testing.T) {
 		size:  size,
 		wait:  int64(wait.Seconds()),
 		data:  make(map[int32]*QueueWindowValue, size),
-		queue: sq.New(size * 2),
+		queue: scq2.New(size * 2),
 	}
 
 	for i := 0; i < put; i++ {
@@ -64,7 +64,7 @@ func TestQueueWindow2(t *testing.T) {
 		size:  size,
 		wait:  int64(wait.Seconds()),
 		data:  make(map[int32]*QueueWindowValue, size),
-		queue: sq.New(size * 2),
+		queue: scq2.New(size * 2),
 	}
 
 	for i := 0; i < put; i++ {
