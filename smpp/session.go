@@ -35,10 +35,10 @@ type SessionTerm struct {
 type SessionConfig struct {
 	EnquireLink    time.Duration                       // 心跳间隔
 	AttemptDial    time.Duration                       // 重连间隔
-	WindowClear    time.Duration                       // 清理窗口内超时请求的时间间隔
 	WindowType     int                                 // 窗口类型，WinTimeout 小或 WinCapacity 大时建议为1
 	WindowSize     int                                 // 窗口大小
 	WindowWait     time.Duration                       // 超时时间
+	WindowScan     time.Duration                       // 清理窗口内超时请求的时间间隔
 	CustomData     any                                 // 自定义数据
 	OnCreateWindow func(string, any) Window            // 根据 system id 创建窗口
 	OnReceive      func(*RRequest, any) pdu.PDU        // 接收到对端非响应 pdu 时执行
@@ -49,14 +49,14 @@ type SessionConfig struct {
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
-	if conf.WindowClear == 0 {
-		conf.WindowClear = time.Minute
-	}
 	if conf.WindowSize == 0 {
 		conf.WindowSize = 100
 	}
 	if conf.WindowWait == 0 {
 		conf.WindowWait = 10 * time.Minute
+	}
+	if conf.WindowScan == 0 {
+		conf.WindowScan = time.Minute
 	}
 
 	s := &Session{
@@ -395,7 +395,7 @@ func (s *Session) allowWrite(p pdu.PDU) bool {
 
 func (s *Session) loopWindow() {
 	go func() {
-		t := time.NewTicker(s.conf.WindowClear)
+		t := time.NewTicker(s.conf.WindowScan)
 		defer func() {
 			t.Stop()
 			s.term.wg.Done()
