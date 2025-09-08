@@ -17,7 +17,7 @@ type Session struct {
 	conn   Connection
 	conf   *SessionConfig
 	term   *SessionTerm
-	tracer *Tracer
+	store  *SessionStore
 	status int32
 	closed int32
 	initAt time.Time
@@ -64,7 +64,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		conn:   conn,
 		conf:   &conf,
 		term:   nil,
-		tracer: _tracer,
+		store:  _store,
 		status: SessionClosed,
 		closed: 0,
 		initAt: time.Now(),
@@ -437,14 +437,14 @@ func (s *Session) onRespond(response *TResponse, values any) {
 }
 
 func (s *Session) onCreated(values any) {
-	s.tracer.AddSession(s)
+	s.store.AddSession(s)
 	if s.conf.OnCreated != nil {
 		s.conf.OnCreated(s, values)
 	}
 }
 
 func (s *Session) onClosed(reason string, desc string, values any) {
-	s.tracer.DelSession(s.id)
+	s.store.DelSession(s.id)
 	if s.conf.OnClosed != nil {
 		s.conf.OnClosed(s, reason, desc, values)
 	}

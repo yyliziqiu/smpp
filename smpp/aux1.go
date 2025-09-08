@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	_tracer = NewTracer()
+	_store = NewSessionStore()
 
 	_logger *logrus.Logger
 )
@@ -49,15 +49,15 @@ func SetLogger(logger *logrus.Logger) {
 }
 
 func GetSession(id string) *Session {
-	return _tracer.GetSession(id)
+	return _store.GetSession(id)
 }
 
 func GetSessions() map[string]*Session {
-	return _tracer.GetSessions()
+	return _store.GetSessions()
 }
 
-func CountSession() int {
-	return _tracer.CountSessions()
+func CountSessions() int {
+	return _store.CountSessions()
 }
 
 func Address(ton byte, npi byte, addr string) pdu.Address {
