@@ -29,6 +29,10 @@ github.com/yyliziqiu/slib v1.0.35 h1:fTlQ1DC4Zzexrf8BiGyDh5lFymxh7FbUAkodt/StSG0
 github.com/yyliziqiu/slib v1.0.35/go.mod h1:8LIzxg5p/Vj2IMjyU7eYsjU+x8ouRm1u+CaasiKIqJ8=
 github.com/yyliziqiu/slib v1.0.39 h1:g8HBgNFlQWKbNM+sZ6Tedfn7uU0cjuywrxgvhRWw1Bo=
 github.com/yyliziqiu/slib v1.0.39/go.mod h1:8LIzxg5p/Vj2IMjyU7eYsjU+x8ouRm1u+CaasiKIqJ8=
+github.com/yyliziqiu/slib v1.0.40 h1:C3i2egsZQnIXYIlRj/jdZYSuwRpcdLdDd6bvzz9ukII=
+github.com/yyliziqiu/slib v1.0.40/go.mod h1:8LIzxg5p/Vj2IMjyU7eYsjU+x8ouRm1u+CaasiKIqJ8=
+github.com/yyliziqiu/slib v1.0.41 h1:yr0nXHJiN2EyHJ/DTep9/lIPo05ddgN4g8T6PGz0C+g=
+github.com/yyliziqiu/slib v1.0.41/go.mod h1:8LIzxg5p/Vj2IMjyU7eYsjU+x8ouRm1u+CaasiKIqJ8=
 golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 h1:LoYXNGAShUG3m/ehNk4iFctuhGX/+R1ZpfJ4/ia80JM=
 golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8/go.mod h1:jj3sYF3dwk5D+ghuXyeI3r5MFf+NT2An6/9dOA95KSI=
 golang.org/x/net v0.15.0 h1:ugBLEUaxABaB5AJqW9enI0ACdci2RUd4eP51NTBvuJ8=
