@@ -9,14 +9,15 @@ import (
 	"github.com/yyliziqiu/slib/ssnap"
 )
 
-type DlrEntry struct {
+type DlrItem struct {
 	MessageId string
 	SystemId  string
+	SessionId string
 	ExpiredAt int64
 	hasTook   bool
 }
 
-type DlrHeap []*DlrEntry
+type DlrHeap []*DlrItem
 
 func (h *DlrHeap) Len() int {
 	return len(*h)
@@ -33,7 +34,7 @@ func (h *DlrHeap) Swap(i int, j int) {
 }
 
 func (h *DlrHeap) Push(v any) {
-	*h = append(*h, v.(*DlrEntry))
+	*h = append(*h, v.(*DlrItem))
 }
 
 func (h *DlrHeap) Pop() any {
@@ -46,11 +47,11 @@ func (h *DlrHeap) Pop() any {
 }
 
 type DlrTracer struct {
-	data     map[string]*DlrEntry
-	heap     DlrHeap
-	dataSnap *ssnap.Snap
-	heapSnap *ssnap.Snap
-	mu       sync.Mutex
+	data  map[string]*DlrItem
+	heap  DlrHeap
+	dSnap *ssnap.Snap
+	hSnap *ssnap.Snap
+	mu    sync.Mutex
 }
 
 func NewDlrTracer(size int) *DlrTracer {
@@ -59,12 +60,12 @@ func NewDlrTracer(size int) *DlrTracer {
 
 func NewDlrTracer2(size int, path string) *DlrTracer {
 	t := &DlrTracer{
-		data: make(map[string]*DlrEntry, size),
+		data: make(map[string]*DlrItem, size),
 		heap: make(DlrHeap, 0, size),
 	}
 	if path != "" {
-		t.dataSnap = ssnap.New(filepath.Join(path, "DlrTracer.data"), &t.data)
-		t.heapSnap = ssnap.New(filepath.Join(path, "DlrTracer.heap"), &t.heap)
+		t.dSnap = ssnap.New(filepath.Join(path, "DlrTracer.data"), &t.data)
+		t.hSnap = ssnap.New(filepath.Join(path, "DlrTracer.heap"), &t.heap)
 	}
 	return t
 }
@@ -73,11 +74,11 @@ func (t *DlrTracer) Save(_ bool) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if err := t.dataSnap.Save(); err != nil {
+	if err := t.dSnap.Save(); err != nil {
 		return err
 	}
 
-	if err := t.heapSnap.Save(); err != nil {
+	if err := t.hSnap.Save(); err != nil {
 		return err
 	}
 
@@ -88,37 +89,37 @@ func (t *DlrTracer) Load() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if err := t.dataSnap.Load(); err != nil {
+	if err := t.dSnap.Load(); err != nil {
 		return err
 	}
 
-	if err := t.heapSnap.Load(); err != nil {
+	if err := t.hSnap.Load(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *DlrTracer) Put(to *DlrEntry) {
+func (t *DlrTracer) Put(item *DlrItem) {
 	t.mu.Lock()
-	t.data[to.MessageId] = to
-	t.heap.Push(to)
+	t.data[item.MessageId] = item
+	t.heap.Push(item)
 	t.mu.Unlock()
 }
 
-func (t *DlrTracer) Take(messageId string) *DlrEntry {
+func (t *DlrTracer) Take(messageId string) *DlrItem {
 	t.mu.Lock()
-	to, ok := t.data[messageId]
+	item, ok := t.data[messageId]
 	if ok {
-		to.hasTook = true
+		item.hasTook = true
 		delete(t.data, messageId)
 	}
 	t.mu.Unlock()
 
-	return to
+	return item
 }
 
-func (t *DlrTracer) TakeTimeout() []*DlrEntry {
+func (t *DlrTracer) TakeTimeout() []*DlrItem {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -126,17 +127,17 @@ func (t *DlrTracer) TakeTimeout() []*DlrEntry {
 		return nil
 	}
 
-	list := make([]*DlrEntry, 0, 32)
+	list := make([]*DlrItem, 0, 32)
 	curr := time.Now().Unix()
 	for len(t.heap) > 0 {
-		to := t.heap[0]
-		if !to.hasTook {
-			if curr < to.ExpiredAt {
+		item := t.heap[0]
+		if !item.hasTook {
+			if curr < item.ExpiredAt {
 				break
 			}
-			list = append(list, to)
-			to.hasTook = true
-			delete(t.data, to.MessageId)
+			list = append(list, item)
+			item.hasTook = true
+			delete(t.data, item.MessageId)
 		}
 		heap.Pop(&t.heap)
 	}

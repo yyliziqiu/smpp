@@ -18,7 +18,7 @@ func StartDlrTracer() {
 	t := smpp.NewDlrTracer(size)
 
 	// put the message id to tracer for dlr trace
-	t.Put(&smpp.DlrEntry{
+	t.Put(&smpp.DlrItem{
 		MessageId: suid.Get(),
 		SystemId:  "user1",
 		ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),

@@ -18,12 +18,12 @@ func TestDlrTracer(t *testing.T) {
 	wait := 20 * time.Second
 
 	w := &DlrTracer{
-		data: make(map[string]*DlrEntry, size),
+		data: make(map[string]*DlrItem, size),
 		heap: make(DlrHeap, 0, size),
 	}
 
 	for i := 0; i < put; i++ {
-		w.Put(&DlrEntry{
+		w.Put(&DlrItem{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
@@ -75,7 +75,7 @@ func TestNewDlrTracer2(t *testing.T) {
 	w := NewDlrTracer2(10, "/private/ws/self/smpp/data")
 
 	for i := 0; i < 3; i++ {
-		w.Put(&DlrEntry{
+		w.Put(&DlrItem{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(i),
