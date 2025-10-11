@@ -1,18 +1,35 @@
-package assit
+package assist
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand/v2"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/yyliziqiu/slib/slog"
 	"github.com/yyliziqiu/slib/stime"
 	"github.com/yyliziqiu/slib/suid"
 
 	"github.com/yyliziqiu/smpp/util"
 )
+
+func TestMain(m *testing.M) {
+	prepare()
+	g := m.Run()
+	finally(g)
+}
+
+func prepare() {
+	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
+	util.SetLogger(slog.New3("assist"))
+}
+
+func finally(code int) {
+	os.Exit(code)
+}
 
 func TestDlrTracer(t *testing.T) {
 	put := 1000000
