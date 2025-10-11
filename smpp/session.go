@@ -30,24 +30,24 @@ type SessionTerm struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	window Window
-	trChan chan *Request
+	rqChan chan *Request
 	dialAt time.Time
 }
 
 type SessionConfig struct {
-	Context        any
-	EnquireLink    time.Duration                   // 心跳间隔
-	AttemptDial    time.Duration                   // 重连间隔
-	WindowType     int                             // 窗口类型，WindowWait 小或 WindowSize 大时建议为1
-	WindowSize     int                             // 窗口大小
-	WindowWait     time.Duration                   // 超时时间
-	WindowScan     time.Duration                   // 清理窗口内超时请求的时间间隔
-	OnCreateWindow func(*Session) Window           // 根据 system id 创建窗口
-	OnReceive      func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
-	OnRequest      func(*Session, *Request)        // 向对端提交 pdu 时执行
-	OnRespond      func(*Session, *Response)       // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
-	OnCreated      func(*Session)                  // 创建会话时执行
-	OnClosed       func(*Session, string, string)  // 关闭会话时执行
+	Context     any
+	EnquireLink time.Duration                   // 心跳间隔
+	AttemptDial time.Duration                   // 重连间隔
+	WindowType  int                             // 窗口类型，WindowWait 小或 WindowSize 大时建议为1
+	WindowSize  int                             // 窗口大小
+	WindowWait  time.Duration                   // 超时时间
+	WindowScan  time.Duration                   // 清理窗口内超时请求的时间间隔
+	NewWindow   func(*Session) Window           // 根据用户创建窗口
+	OnReceive   func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
+	OnRequest   func(*Session, *Request)        // 向对端提交 pdu 时执行
+	OnRespond   func(*Session, *Response)       // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
+	OnDialed    func(*Session)                  // 连接成功时执行
+	OnClosed    func(*Session, string, string)  // 关闭会话时执行
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
@@ -77,8 +77,6 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		return nil, err
 	}
 
-	s.onCreated()
-
 	return s, nil
 }
 
@@ -95,30 +93,30 @@ func (s *Session) dial() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.term = &SessionTerm{
-		wg:     sync.WaitGroup{},
 		ctx:    ctx,
 		cancel: cancel,
-		window: s.createWindow(),
-		trChan: make(chan *Request, 1),
+		window: s.newWindow(),
+		rqChan: make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
-
 	s.term.wg.Add(3)
 
 	atomic.StoreInt32(&s.status, SessionActive)
 
+	s.onDialed()
+
 	s.loopRead()
 	s.loopWrite()
-	s.loopWindow()
+	s.loopClear()
 
 	util.LogInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
 
 	return nil
 }
 
-func (s *Session) createWindow() Window {
-	if s.conf.OnCreateWindow != nil {
-		return s.conf.OnCreateWindow(s)
+func (s *Session) newWindow() Window {
+	if s.conf.NewWindow != nil {
+		return s.conf.NewWindow(s)
 	}
 
 	switch s.conf.WindowType {
@@ -224,8 +222,8 @@ func (s *Session) close(reason string, desc string) {
 		_ = s.conn.Close()
 
 		// 清理会话数据
-		close(s.term.trChan)
-		for request := range s.term.trChan {
+		close(s.term.rqChan)
+		for request := range s.term.rqChan {
 			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
 		}
 		s.term.window = nil
@@ -269,7 +267,7 @@ func (s *Session) allowRead(p pdu.PDU) bool {
 }
 
 func (s *Session) writeToQueue(p pdu.PDU, submitter int8) {
-	s.term.trChan <- s.newRequest(p, submitter)
+	s.term.rqChan <- s.newRequest(p, submitter)
 }
 
 func (s *Session) newRequest(p pdu.PDU, submitter int8) *Request {
@@ -293,7 +291,7 @@ func (s *Session) loopWrite() {
 				case <-s.term.ctx.Done():
 					s.logLoopWriteExit()
 					return
-				case r := <-s.term.trChan:
+				case r := <-s.term.rqChan:
 					if s.write(r) {
 						s.logLoopWriteStop()
 						return
@@ -313,7 +311,7 @@ func (s *Session) loopWrite() {
 				case <-s.term.ctx.Done():
 					s.logLoopWriteExit()
 					return
-				case r := <-s.term.trChan:
+				case r := <-s.term.rqChan:
 					if s.write(r) {
 						s.logLoopWriteStop()
 						return
@@ -391,7 +389,7 @@ func (s *Session) allowWrite(p pdu.PDU) bool {
 	return true
 }
 
-func (s *Session) loopWindow() {
+func (s *Session) loopClear() {
 	go func() {
 		t := time.NewTicker(s.conf.WindowScan)
 		defer func() {
@@ -434,10 +432,10 @@ func (s *Session) onRespond(response *Response) {
 	}
 }
 
-func (s *Session) onCreated() {
+func (s *Session) onDialed() {
 	s.store.AddSession(s)
-	if s.conf.OnCreated != nil {
-		s.conf.OnCreated(s)
+	if s.conf.OnDialed != nil {
+		s.conf.OnDialed(s)
 	}
 }
 
@@ -488,7 +486,9 @@ func (s *Session) Write(p pdu.PDU) error {
 	if atomic.LoadInt32(&s.status) == SessionClosed {
 		return ErrSessionClosed
 	}
+
 	s.writeToQueue(p, SubmitterUser)
+
 	return nil
 }
 

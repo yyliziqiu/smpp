@@ -52,7 +52,7 @@ func StartClient() {
 		// or occurred error before submit
 		// or wait the response of pdu timeout
 		//
-		// the TResponse.Pdu must be nil if the TResponse.Error is not nil
+		// the Response.Pdu must be nil if the TResponse.Error is not nil
 		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
 
 		},
