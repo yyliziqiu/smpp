@@ -70,7 +70,7 @@ func StartClient() {
 	defer sess.Close()
 
 	// submit pdu by session
-	err = sess.Write(newSubmitSm())
+	err = sess.Write(submitSmPdu())
 	if err != nil {
 		log.Println("Error: ", err)
 	}
@@ -78,7 +78,7 @@ func StartClient() {
 	exit()
 }
 
-func newSubmitSm() *pdu.SubmitSM {
+func submitSmPdu() *pdu.SubmitSM {
 	p := pdu.NewSubmitSM().(*pdu.SubmitSM)
 	p.SourceAddr = smpp.Address(5, 0, "matrix")
 	p.DestAddr = smpp.Address(1, 1, "86387490")

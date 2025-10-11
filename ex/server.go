@@ -69,16 +69,16 @@ func accept(conn net.Conn) {
 	}
 
 	// deliver pdu to client
-	_ = sess.Write(newDeliverSm())
+	_ = sess.Write(deliverSmPdu())
 }
 
-func newDeliverSm() *pdu.DeliverSM {
-	dlr := tool.Dlr{
+func deliverSmPdu() *pdu.DeliverSM {
+	dlr := smpp.Dlr{
 		Id:    suid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
-		SDate: time.Now(),
-		DDate: time.Now(),
+		Sd:    time.Now(),
+		Dd:    time.Now(),
 		Stat:  "DELIVRD",
 		Err:   "000",
 		Text:  "success",

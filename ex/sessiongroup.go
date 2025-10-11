@@ -6,20 +6,21 @@ import (
 
 	"github.com/linxGnu/gosmpp/pdu"
 
+	"github.com/yyliziqiu/smpp/assit"
 	"github.com/yyliziqiu/smpp/smpp"
 )
 
 func SessionGroupExample() {
-	group := tool.NewSessionGroup(&tool.SessionGroupConfig{
+	group := assit.NewSessionGroup(&assit.SessionGroupConfig{
 		GroupId:  "group1",
 		Capacity: 3,
 		AutoFill: true,
 		Values:   "test group1",
-		Create: func(group *tool.SessionGroup, val any) (*smpp.Session, error) {
+		Create: func(group *assit.SessionGroup, val any) (*smpp.Session, error) {
 			fmt.Println("create session: ", val)
 			return newSessionForGroup(group)
 		},
-		Failed: func(group *tool.SessionGroup, err error) {
+		Failed: func(group *assit.SessionGroup, err error) {
 			fmt.Println("Error: ", err)
 		},
 	})
@@ -37,7 +38,7 @@ func SessionGroupExample() {
 	group.Destroy()
 }
 
-func newSessionForGroup(group *tool.SessionGroup) (*smpp.Session, error) {
+func newSessionForGroup(group *assit.SessionGroup) (*smpp.Session, error) {
 	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
 		Smsc:     "127.0.0.1:10088",
 		SystemId: "user1",
@@ -58,7 +59,7 @@ func newSessionForGroup(group *tool.SessionGroup) (*smpp.Session, error) {
 }
 
 func SessionGroupManagerExample() {
-	manager := tool.NewSessionGroupManager(tool.SessionGroupManagerConfig{
+	manager := assit.NewSessionGroupManager(assit.SessionGroupManagerConfig{
 		AdjustInterval: 5 * time.Second,
 	})
 
@@ -78,13 +79,13 @@ func SessionGroupManagerExample() {
 	time.Sleep(3 * time.Second)
 }
 
-func newSessionGroupConfigForManager(id string) tool.SessionGroupConfig {
-	return tool.SessionGroupConfig{
+func newSessionGroupConfigForManager(id string) assit.SessionGroupConfig {
+	return assit.SessionGroupConfig{
 		GroupId:  id,
 		Capacity: 3,
 		AutoFill: true,
 		Values:   "test group1",
-		Create: func(group *tool.SessionGroup, val any) (*smpp.Session, error) {
+		Create: func(group *assit.SessionGroup, val any) (*smpp.Session, error) {
 			fmt.Println("create session: ", val)
 			conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
 				Smsc:     "127.0.0.1:10088",
@@ -101,7 +102,7 @@ func newSessionGroupConfigForManager(id string) tool.SessionGroupConfig {
 				},
 			})
 		},
-		Failed: func(group *tool.SessionGroup, err error) {
+		Failed: func(group *assit.SessionGroup, err error) {
 			fmt.Println("Error: ", err)
 		},
 	}
