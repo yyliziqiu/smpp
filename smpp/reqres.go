@@ -24,13 +24,13 @@ type Request struct {
 type Response struct {
 	Request *Request
 	Pdu     pdu.PDU
-	Error   error
+	Err     error
 }
 
-func NewTResponse(req *Request, p pdu.PDU, err error) *Response {
+func NewResponse(request *Request, p pdu.PDU, err error) *Response {
 	return &Response{
-		Request: req,
+		Request: request,
 		Pdu:     p,
-		Error:   err,
+		Err:     err,
 	}
 }

@@ -196,7 +196,7 @@ func (s *Session) read() bool {
 	} else {
 		tr := s.term.window.Take(p.GetSequenceNumber())
 		if tr != nil {
-			s.onRespond(NewTResponse(tr, p, nil))
+			s.onRespond(NewResponse(tr, p, nil))
 		}
 	}
 
@@ -226,7 +226,7 @@ func (s *Session) close(reason string, desc string) {
 		// 清理会话数据
 		close(s.term.trChan)
 		for request := range s.term.trChan {
-			s.onRespond(NewTResponse(request, nil, ErrChannelClosed))
+			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
 		}
 		s.term.window = nil
 
@@ -343,12 +343,12 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	if s.closed == 1 {
-		s.onRespond(NewTResponse(request, nil, ErrSessionClosed))
+		s.onRespond(NewResponse(request, nil, ErrSessionClosed))
 		return true
 	}
 
 	if !s.allowWrite(request.Pdu) {
-		s.onRespond(NewTResponse(request, nil, ErrNotAllowed))
+		s.onRespond(NewResponse(request, nil, ErrNotAllowed))
 		return false
 	}
 
@@ -359,7 +359,7 @@ func (s *Session) write(request *Request) bool {
 		err := s.term.window.Put(request)
 		if err != nil {
 			util.LogWarn("[Session@%s:%s] Put request to window failed, error: %v", s.id, s.SystemId(), err)
-			s.onRespond(NewTResponse(request, nil, err))
+			s.onRespond(NewResponse(request, nil, err))
 			return false
 		}
 	}
@@ -367,7 +367,7 @@ func (s *Session) write(request *Request) bool {
 	n, err := s.conn.Write(request.Pdu)
 	if err != nil {
 		util.LogWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
-		s.onRespond(NewTResponse(request, nil, err))
+		s.onRespond(NewResponse(request, nil, err))
 		if n > 0 {
 			s.close(CloseByError, err.Error())
 			return true
@@ -407,7 +407,7 @@ func (s *Session) loopWindow() {
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
-					s.onRespond(NewTResponse(request, nil, ErrResponseTimeout))
+					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 				}
 				util.LogDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
 			}
