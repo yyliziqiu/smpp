@@ -1,4 +1,4 @@
-package example
+package ex
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/yyliziqiu/slib/suid"
-
-	"github.com/yyliziqiu/smpp/smpp"
 )
 
 func StartDlrTracer() {
@@ -15,10 +13,10 @@ func StartDlrTracer() {
 	wait := time.Minute
 
 	// create a tracer
-	t := smpp.NewDlrTracer(size)
+	t := tool.NewDlrTracer(size)
 
 	// put the message id to tracer for dlr trace
-	t.Put(&smpp.DlrItem{
+	t.Put(&tool.DlrItem{
 		MessageId: suid.Get(),
 		SystemId:  "user1",
 		ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),

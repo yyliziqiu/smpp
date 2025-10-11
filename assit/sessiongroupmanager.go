@@ -1,4 +1,4 @@
-package smpp
+package assit
 
 import (
 	"fmt"

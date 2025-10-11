@@ -1,4 +1,4 @@
-package smpp
+package assit
 
 import (
 	"container/heap"
@@ -9,15 +9,15 @@ import (
 	"github.com/yyliziqiu/slib/ssnap"
 )
 
-type DlrItem struct {
+type DlrHeap []*DlrNode
+
+type DlrNode struct {
 	MessageId string
 	SystemId  string
 	SessionId string
 	ExpiredAt int64
 	hasTook   bool
 }
-
-type DlrHeap []*DlrItem
 
 func (h *DlrHeap) Len() int {
 	return len(*h)
@@ -34,7 +34,7 @@ func (h *DlrHeap) Swap(i int, j int) {
 }
 
 func (h *DlrHeap) Push(v any) {
-	*h = append(*h, v.(*DlrItem))
+	*h = append(*h, v.(*DlrNode))
 }
 
 func (h *DlrHeap) Pop() any {
@@ -47,7 +47,7 @@ func (h *DlrHeap) Pop() any {
 }
 
 type DlrTracer struct {
-	data  map[string]*DlrItem
+	data  map[string]*DlrNode
 	heap  DlrHeap
 	dSnap *ssnap.Snap
 	hSnap *ssnap.Snap
@@ -60,7 +60,7 @@ func NewDlrTracer(size int) *DlrTracer {
 
 func NewDlrTracer2(size int, path string) *DlrTracer {
 	t := &DlrTracer{
-		data: make(map[string]*DlrItem, size),
+		data: make(map[string]*DlrNode, size),
 		heap: make(DlrHeap, 0, size),
 	}
 	if path != "" {
@@ -100,26 +100,26 @@ func (t *DlrTracer) Load() error {
 	return nil
 }
 
-func (t *DlrTracer) Put(item *DlrItem) {
+func (t *DlrTracer) Put(dn *DlrNode) {
 	t.mu.Lock()
-	t.data[item.MessageId] = item
-	t.heap.Push(item)
+	t.data[dn.MessageId] = dn
+	t.heap.Push(dn)
 	t.mu.Unlock()
 }
 
-func (t *DlrTracer) Take(messageId string) *DlrItem {
+func (t *DlrTracer) Take(messageId string) *DlrNode {
 	t.mu.Lock()
-	item, ok := t.data[messageId]
+	dn, ok := t.data[messageId]
 	if ok {
-		item.hasTook = true
+		dn.hasTook = true
 		delete(t.data, messageId)
 	}
 	t.mu.Unlock()
 
-	return item
+	return dn
 }
 
-func (t *DlrTracer) TakeTimeout() []*DlrItem {
+func (t *DlrTracer) TakeTimeout() []*DlrNode {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -127,17 +127,17 @@ func (t *DlrTracer) TakeTimeout() []*DlrItem {
 		return nil
 	}
 
-	list := make([]*DlrItem, 0, 32)
+	list := make([]*DlrNode, 0, 32)
 	curr := time.Now().Unix()
 	for len(t.heap) > 0 {
-		item := t.heap[0]
-		if !item.hasTook {
-			if curr < item.ExpiredAt {
+		dn := t.heap[0]
+		if !dn.hasTook {
+			if curr < dn.ExpiredAt {
 				break
 			}
-			list = append(list, item)
-			item.hasTook = true
-			delete(t.data, item.MessageId)
+			list = append(list, dn)
+			dn.hasTook = true
+			delete(t.data, dn.MessageId)
 		}
 		heap.Pop(&t.heap)
 	}

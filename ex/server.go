@@ -1,4 +1,4 @@
-package example
+package ex
 
 import (
 	"fmt"
@@ -41,22 +41,22 @@ func accept(conn net.Conn) {
 
 	// set session config
 	conf := smpp.SessionConfig{
-		OnReceive: func(request *smpp.RRequest, _ any) pdu.PDU {
-			switch request.Pdu.(type) {
+		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
+			switch p.(type) {
 			case *pdu.SubmitSM:
-				p := request.Pdu.GetResponse().(*pdu.SubmitSMResp)
-				p.MessageID = suid.Get()
-				return p
+				p2 := p.GetResponse().(*pdu.SubmitSMResp)
+				p2.MessageID = suid.Get()
+				return p2
 			}
-			if request.Pdu.CanResponse() {
-				return request.Pdu.GetResponse()
+			if p.CanResponse() {
+				return p.GetResponse()
 			}
 			return nil
 		},
-		OnRespond: func(response *smpp.TResponse, _ any) {
+		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
 
 		},
-		OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string) {
 
 		},
 	}
@@ -73,7 +73,7 @@ func accept(conn net.Conn) {
 }
 
 func newDeliverSm() *pdu.DeliverSM {
-	dlr := smpp.Dlr{
+	dlr := tool.Dlr{
 		Id:    suid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",

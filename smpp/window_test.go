@@ -9,6 +9,8 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/scq2"
 	"github.com/yyliziqiu/slib/stime"
+
+	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestQueueWindow(t *testing.T) {
@@ -24,9 +26,9 @@ func TestQueueWindow(t *testing.T) {
 	}
 
 	for i := 0; i < put; i++ {
-		request := &TRequest{
-			SubmitAt: time.Now().Unix(),
+		request := &Request{
 			Pdu:      pdu.NewSubmitSM(),
+			SubmitAt: time.Now().Unix(),
 		}
 		err := w.Put(request)
 		if err != nil {
@@ -68,9 +70,9 @@ func TestQueueWindow2(t *testing.T) {
 	}
 
 	for i := 0; i < put; i++ {
-		request := &TRequest{
-			SubmitAt: time.Now().Unix(),
+		request := &Request{
 			Pdu:      pdu.NewSubmitSM(),
+			SubmitAt: time.Now().Unix(),
 		}
 		err := w.Put(request)
 		if err != nil {
@@ -78,7 +80,7 @@ func TestQueueWindow2(t *testing.T) {
 		}
 	}
 
-	printMemory("put", true)
+	util.PrintMemory("put", true)
 
 	for k := range w.data {
 		if k%2 == 0 {
@@ -86,7 +88,7 @@ func TestQueueWindow2(t *testing.T) {
 		}
 	}
 
-	printMemory("take", true)
+	util.PrintMemory("take", true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -108,11 +110,11 @@ func TestQueueWindow2(t *testing.T) {
 	}()
 
 	time.Sleep(wait + 3*time.Second)
-	printMemory("clear timeout", true)
+	util.PrintMemory("clear timeout", true)
 
 	cancel()
 	time.Sleep(time.Second)
 	w = nil
 
-	printMemory("clear all", true)
+	util.PrintMemory("clear all", true)
 }

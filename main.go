@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/yyliziqiu/smpp/example"
+	"github.com/yyliziqiu/smpp/ex"
 )
 
 func main() {
-	example.StartServer()
+	ex.StartServer()
 }

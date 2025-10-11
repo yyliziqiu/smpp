@@ -1,4 +1,4 @@
-package smpp
+package assit
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 
 	"github.com/yyliziqiu/slib/stime"
 	"github.com/yyliziqiu/slib/suid"
+
+	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestDlrTracer(t *testing.T) {
@@ -18,19 +20,19 @@ func TestDlrTracer(t *testing.T) {
 	wait := 20 * time.Second
 
 	w := &DlrTracer{
-		data: make(map[string]*DlrItem, size),
+		data: make(map[string]*DlrNode, size),
 		heap: make(DlrHeap, 0, size),
 	}
 
 	for i := 0; i < put; i++ {
-		w.Put(&DlrItem{
+		w.Put(&DlrNode{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 		})
 	}
 
-	printMemory("put", true)
+	util.PrintMemory("put", true)
 
 	ti := 0
 	for k := range w.data {
@@ -40,7 +42,7 @@ func TestDlrTracer(t *testing.T) {
 		}
 	}
 
-	printMemory("take", true)
+	util.PrintMemory("take", true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -62,20 +64,20 @@ func TestDlrTracer(t *testing.T) {
 	}()
 
 	time.Sleep(wait + 3*time.Second)
-	printMemory("clear timeout", true)
+	util.PrintMemory("clear timeout", true)
 
 	cancel()
 	time.Sleep(time.Second)
 	w = nil
 
-	printMemory("clear all", true)
+	util.PrintMemory("clear all", true)
 }
 
 func TestNewDlrTracer2(t *testing.T) {
 	w := NewDlrTracer2(10, "/private/ws/self/smpp/data")
 
 	for i := 0; i < 3; i++ {
-		w.Put(&DlrItem{
+		w.Put(&DlrNode{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
 			ExpiredAt: time.Now().Unix() + int64(i),

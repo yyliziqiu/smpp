@@ -1,6 +1,7 @@
 package smpp
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/slog"
 	"github.com/yyliziqiu/slib/suid"
+
+	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestMain(m *testing.M) {
@@ -20,11 +23,41 @@ func TestMain(m *testing.M) {
 
 func prepare() {
 	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
-	SetLogger(slog.New3("smpp"))
+	util.SetLogger(slog.New3("smpp"))
 }
 
 func finally(code int) {
 	os.Exit(code)
+}
+
+func printPdu(tag string, systemId string, p pdu.PDU) {
+	if p != nil {
+		bs, _ := json.MarshalIndent(p, "", "  ")
+		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
+	}
+}
+
+func submitSmPdu() *pdu.SubmitSM {
+	p := pdu.NewSubmitSM().(*pdu.SubmitSM)
+	p.SourceAddr = Address(5, 0, "matrix")
+	p.DestAddr = Address(1, 1, "6281339900520")
+	p.Message = Message("68526b7e01614899")
+	p.RegisteredDelivery = 1
+	return p
+}
+
+func deliverSmPdu() *pdu.DeliverSM {
+	dlr := Dlr{
+		Id:    suid.Get(),
+		Sub:   "001",
+		Dlvrd: "001",
+		Sd:    time.Now(),
+		Dd:    time.Now(),
+		Stat:  "DELIVRD",
+		Err:   "000",
+		Text:  "success",
+	}
+	return dlr.Pdu("6281339900520", "matrix")
 }
 
 var (
@@ -48,19 +81,18 @@ func TestClientSession(t *testing.T) {
 	conf := SessionConfig{
 		EnquireLink: 60 * time.Second,
 		AttemptDial: 10 * time.Second,
-		CustomData:  "this is a test session",
-		OnReceive: func(request *RRequest, _ any) pdu.PDU {
-			logTest("received", request.Session.SystemId(), request.Pdu)
-			if request.Pdu.CanResponse() {
-				return request.Pdu.GetResponse()
+		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
+			printPdu("received", sess.SystemId(), p)
+			if p.CanResponse() {
+				return p.GetResponse()
 			}
 			return nil
 		},
-		OnRespond: func(response *TResponse, values any) {
+		OnRespond: func(sess *Session, resp *Response) {
 			// fmt.Println("user custom data: ", values)
-			logTest("response", response.Request.SystemId, response.Pdu)
+			printPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
-		OnClosed: func(sess *Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}
@@ -77,7 +109,7 @@ func TestClientSession(t *testing.T) {
 	}()
 
 	for i := 0; i < 2; i++ {
-		if err = sess.Write(newTestSubmitSM()); err != nil {
+		if err = sess.Write(submitSmPdu()); err != nil {
 			t.Error(err)
 		}
 		time.Sleep(time.Second)
@@ -109,23 +141,23 @@ func accept(conn net.Conn) {
 	connect := NewServerConnection(conn, _serverConnectionConfig)
 
 	conf := SessionConfig{
-		OnReceive: func(request *RRequest, _ any) pdu.PDU {
-			logTest("received", request.Session.SystemId(), request.Pdu)
-			switch request.Pdu.(type) {
+		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
+			printPdu("received", sess.SystemId(), p)
+			switch p.(type) {
 			case *pdu.SubmitSM:
-				p := request.Pdu.GetResponse().(*pdu.SubmitSMResp)
-				p.MessageID = suid.Get()
-				return p
+				p2 := p.GetResponse().(*pdu.SubmitSMResp)
+				p2.MessageID = suid.Get()
+				return p2
 			}
-			if request.Pdu.CanResponse() {
-				return request.Pdu.GetResponse()
+			if p.CanResponse() {
+				return p.GetResponse()
 			}
 			return nil
 		},
-		OnRespond: func(response *TResponse, _ any) {
-			logTest("response", response.Request.SystemId, response.Pdu)
+		OnRespond: func(sess *Session, resp *Response) {
+			printPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
-		OnClosed: func(sess *Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}
@@ -138,7 +170,7 @@ func accept(conn net.Conn) {
 
 	// 测试写
 	for i := 0; i < 3; i++ {
-		_ = sess.Write(newTestDeliverSM())
+		_ = sess.Write(deliverSmPdu())
 	}
 
 	// time.Sleep(10 * time.Second)

@@ -1,4 +1,4 @@
-package example
+package ex
 
 import (
 	"fmt"
@@ -10,16 +10,16 @@ import (
 )
 
 func SessionGroupExample() {
-	group := smpp.NewSessionGroup(&smpp.SessionGroupConfig{
+	group := tool.NewSessionGroup(&tool.SessionGroupConfig{
 		GroupId:  "group1",
 		Capacity: 3,
 		AutoFill: true,
 		Values:   "test group1",
-		Create: func(group *smpp.SessionGroup, val any) (*smpp.Session, error) {
+		Create: func(group *tool.SessionGroup, val any) (*smpp.Session, error) {
 			fmt.Println("create session: ", val)
 			return newSessionForGroup(group)
 		},
-		Failed: func(group *smpp.SessionGroup, err error) {
+		Failed: func(group *tool.SessionGroup, err error) {
 			fmt.Println("Error: ", err)
 		},
 	})
@@ -37,7 +37,7 @@ func SessionGroupExample() {
 	group.Destroy()
 }
 
-func newSessionForGroup(group *smpp.SessionGroup) (*smpp.Session, error) {
+func newSessionForGroup(group *tool.SessionGroup) (*smpp.Session, error) {
 	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
 		Smsc:     "127.0.0.1:10088",
 		SystemId: "user1",
@@ -48,7 +48,7 @@ func newSessionForGroup(group *smpp.SessionGroup) (*smpp.Session, error) {
 	conf := smpp.SessionConfig{
 		EnquireLink: 30 * time.Second,
 		AttemptDial: 10 * time.Second,
-		OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string) {
 			group.Del(sess.Id())
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
@@ -58,7 +58,7 @@ func newSessionForGroup(group *smpp.SessionGroup) (*smpp.Session, error) {
 }
 
 func SessionGroupManagerExample() {
-	manager := smpp.NewSessionGroupManager(smpp.SessionGroupManagerConfig{
+	manager := tool.NewSessionGroupManager(tool.SessionGroupManagerConfig{
 		AdjustInterval: 5 * time.Second,
 	})
 
@@ -78,13 +78,13 @@ func SessionGroupManagerExample() {
 	time.Sleep(3 * time.Second)
 }
 
-func newSessionGroupConfigForManager(id string) smpp.SessionGroupConfig {
-	return smpp.SessionGroupConfig{
+func newSessionGroupConfigForManager(id string) tool.SessionGroupConfig {
+	return tool.SessionGroupConfig{
 		GroupId:  id,
 		Capacity: 3,
 		AutoFill: true,
 		Values:   "test group1",
-		Create: func(group *smpp.SessionGroup, val any) (*smpp.Session, error) {
+		Create: func(group *tool.SessionGroup, val any) (*smpp.Session, error) {
 			fmt.Println("create session: ", val)
 			conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
 				Smsc:     "127.0.0.1:10088",
@@ -95,13 +95,13 @@ func newSessionGroupConfigForManager(id string) smpp.SessionGroupConfig {
 			return smpp.NewSession(conn, smpp.SessionConfig{
 				EnquireLink: 30 * time.Second,
 				AttemptDial: 10 * time.Second,
-				OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
+				OnClosed: func(sess *smpp.Session, reason string, desc string) {
 					group.Del(sess.Id())
 					fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 				},
 			})
 		},
-		Failed: func(group *smpp.SessionGroup, err error) {
+		Failed: func(group *tool.SessionGroup, err error) {
 			fmt.Println("Error: ", err)
 		},
 	}

@@ -1,4 +1,4 @@
-package example
+package ex
 
 import (
 	"fmt"
@@ -16,8 +16,7 @@ import (
 func StartClient() {
 	// create client connection
 	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
-		// connect by tls
-		// Dial:     smpp.DefaultTlsDial,
+		// Dial:     smpp.DefaultTlsDial, // connect by tls
 		Smsc:     "127.0.0.1:10088",
 		SystemId: "user1",
 		Password: "user1",
@@ -26,12 +25,12 @@ func StartClient() {
 
 	// set session config
 	conf := smpp.SessionConfig{
+		// custom user data
+		Context: 1,
 		// heartbeat interval
 		EnquireLink: 60 * time.Second,
 		// redial interval, session will auto redial when the tcp connection is broke if the AttemptDial > 0
 		AttemptDial: 5 * time.Second,
-		// user custom data
-		CustomData: "user data",
 		// when the window size is large or request timeout is small, set the WindowType = 1
 		// WindowType: 1,
 		// the window size
@@ -39,26 +38,26 @@ func StartClient() {
 		// timeout of request in the window
 		// WindowWait: 300 * time.Second,
 		// invoked when received the non-responsive pdu
-		OnReceive: func(request *smpp.RRequest, _ any) pdu.PDU {
-			if request.Pdu.CanResponse() {
-				return request.Pdu.GetResponse()
+		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
+			if p.CanResponse() {
+				return p.GetResponse()
 			}
 			return nil
 		},
 		// invoked before submit the pdu, you can get an auto-assigned message id of the submitted pdu
-		OnRequest: func(request *smpp.TRequest, _ any) {
-			_ = request.MessageId
+		OnRequest: func(sess *smpp.Session, req *smpp.Request) {
+			_ = req.MessageId
 		},
 		// invoked when received the responsive pdu
 		// or occurred error before submit
 		// or wait the response of pdu timeout
 		//
 		// the TResponse.Pdu must be nil if the TResponse.Error is not nil
-		OnRespond: func(response *smpp.TResponse, _ any) {
+		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
 
 		},
 		// invoked after the session is closed
-		OnClosed: func(sess *smpp.Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}

@@ -8,39 +8,37 @@ import (
 )
 
 type Window interface {
-	Put(*TRequest) error
-	Take(int32) *TRequest
-	TakeTimeout() []*TRequest
+	Put(*Request) error
+	Take(int32) *Request
+	TakeTimeout() []*Request
 }
 
 // ============ MapWindow ============
 
 type MapWindow struct {
-	size int                 // 窗口大小
-	wait int64               // 请求超时时间
-	data map[int32]*TRequest //
-	mu   sync.Mutex          //
+	size int                // 窗口大小
+	wait int64              // 请求超时时间
+	data map[int32]*Request //
+	mu   sync.Mutex         //
 }
 
 func NewMapWindow(size int, wait time.Duration) Window {
 	return &MapWindow{
 		size: size,
 		wait: int64(wait.Seconds()),
-		data: make(map[int32]*TRequest, size),
+		data: make(map[int32]*Request, size),
 	}
 }
 
-func (w *MapWindow) Put(request *TRequest) error {
+func (w *MapWindow) Put(request *Request) error {
 	w.mu.Lock()
 	err := w.put(request)
-	// logDebug("[MapWindow] Put request, sequence: %d, ok: %v", request.Pdu.GetSequenceNumber(), err == nil)
-	// logDebug("[MapWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return err
 }
 
-func (w *MapWindow) put(request *TRequest) error {
+func (w *MapWindow) put(request *Request) error {
 	if len(w.data) >= w.size {
 		return ErrWindowFull
 	}
@@ -50,21 +48,19 @@ func (w *MapWindow) put(request *TRequest) error {
 	return nil
 }
 
-func (w *MapWindow) Take(sequence int32) *TRequest {
+func (w *MapWindow) Take(sequence int32) *Request {
 	w.mu.Lock()
 	request, ok := w.data[sequence]
 	if ok {
 		delete(w.data, sequence)
 	}
-	// logDebug("[MapWindow] Take request, sequence: %d, ok: %v", sequence, request != nil)
-	// logDebug("[MapWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return request
 }
 
-func (w *MapWindow) TakeTimeout() []*TRequest {
-	requests := make([]*TRequest, 0, w.size/5)
+func (w *MapWindow) TakeTimeout() []*Request {
+	requests := make([]*Request, 0, w.size/5)
 
 	w.mu.Lock()
 	curr := time.Now().Unix()
@@ -74,8 +70,6 @@ func (w *MapWindow) TakeTimeout() []*TRequest {
 			requests = append(requests, request)
 		}
 	}
-	// logDebug("[MapWindow] Take timeout requests, count: %d", len(requests))
-	// logDebug("[MapWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return requests
@@ -92,7 +86,7 @@ type QueueWindow struct {
 }
 
 type QueueWindowValue struct {
-	Request *TRequest
+	Request *Request
 }
 
 func NewQueueWindow(size int, wait time.Duration) Window {
@@ -104,17 +98,15 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 	}
 }
 
-func (w *QueueWindow) Put(request *TRequest) error {
+func (w *QueueWindow) Put(request *Request) error {
 	w.mu.Lock()
 	err := w.put(request)
-	// logDebug("[QueueWindow] Put request, sequence: %d, ok: %v", request.Pdu.GetSequenceNumber(), err == nil)
-	// logDebug("[QueueWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return err
 }
 
-func (w *QueueWindow) put(request *TRequest) error {
+func (w *QueueWindow) put(request *Request) error {
 	if len(w.data) >= w.size {
 		return ErrWindowFull
 	}
@@ -130,17 +122,15 @@ func (w *QueueWindow) put(request *TRequest) error {
 	return nil
 }
 
-func (w *QueueWindow) Take(sequence int32) *TRequest {
+func (w *QueueWindow) Take(sequence int32) *Request {
 	w.mu.Lock()
 	request := w.take(sequence)
-	// logDebug("[QueueWindow] Take request, sequence: %d, ok: %v", sequence, request != nil)
-	// logDebug("[QueueWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return request
 }
 
-func (w *QueueWindow) take(sequence int32) *TRequest {
+func (w *QueueWindow) take(sequence int32) *Request {
 	value, ok := w.data[sequence]
 	if !ok {
 		return nil
@@ -155,8 +145,8 @@ func (w *QueueWindow) take(sequence int32) *TRequest {
 	return request
 }
 
-func (w *QueueWindow) TakeTimeout() []*TRequest {
-	list := make([]*TRequest, 0, w.size/5)
+func (w *QueueWindow) TakeTimeout() []*Request {
+	list := make([]*Request, 0, w.size/5)
 	curr := time.Now().Unix()
 
 	w.mu.Lock()
@@ -172,8 +162,6 @@ func (w *QueueWindow) TakeTimeout() []*TRequest {
 		}
 		return false
 	})
-	// logDebug("[QueueWindow] Take timeout requests, count: %d", len(list))
-	// logDebug("[QueueWindow] Data: %v", w.data)
 	w.mu.Unlock()
 
 	return list

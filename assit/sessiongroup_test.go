@@ -1,10 +1,21 @@
-package smpp
+package assit
 
 import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/linxGnu/gosmpp/pdu"
+
+	"github.com/yyliziqiu/smpp/smpp"
 )
+
+var _clientConnectionConfig = smpp.ClientConnectionConfig{
+	Smsc:     "127.0.0.1:10088",
+	SystemId: "user1",
+	Password: "user1",
+	BindType: pdu.Transceiver,
+}
 
 func TestSessionGroup(t *testing.T) {
 	group := NewSessionGroup(&SessionGroupConfig{
@@ -12,7 +23,7 @@ func TestSessionGroup(t *testing.T) {
 		Capacity: 3,
 		AutoFill: true,
 		Values:   "test group1",
-		Create: func(group *SessionGroup, val any) (*Session, error) {
+		Create: func(group *SessionGroup, val any) (*smpp.Session, error) {
 			fmt.Println("create session: ", val)
 			return SessionGroupNewSession(group)
 		},
@@ -36,17 +47,17 @@ func TestSessionGroup(t *testing.T) {
 	time.Sleep(3 * time.Second)
 }
 
-func SessionGroupNewSession(group *SessionGroup) (*Session, error) {
-	conf := SessionConfig{
+func SessionGroupNewSession(group *SessionGroup) (*smpp.Session, error) {
+	conf := smpp.SessionConfig{
 		EnquireLink: 30 * time.Second,
 		AttemptDial: 10 * time.Second,
-		OnClosed: func(sess *Session, reason string, desc string, _ any) {
+		OnClosed: func(sess *smpp.Session, reason string, desc string) {
 			group.Del(sess.Id())
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}
 
-	return NewSession(NewClientConnection(_clientConnectionConfig), conf)
+	return smpp.NewSession(smpp.NewClientConnection(_clientConnectionConfig), conf)
 }
 
 func TestSessionGroup2(t *testing.T) {

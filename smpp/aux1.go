@@ -3,50 +3,11 @@ package smpp
 import (
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/sirupsen/logrus"
 )
 
-var (
-	_store = NewSessionStore()
+// ============ Session ============
 
-	_logger *logrus.Logger
-)
-
-// ============ Inner ============
-
-func logDebug(s string, a ...any) {
-	if _logger == nil {
-		return
-	}
-	_logger.Debugf(s, a...)
-}
-
-func logInfo(s string, a ...any) {
-	if _logger == nil {
-		return
-	}
-	_logger.Infof(s, a...)
-}
-
-func logWarn(s string, a ...any) {
-	if _logger == nil {
-		return
-	}
-	_logger.Warnf(s, a...)
-}
-
-func logError(s string, a ...any) {
-	if _logger == nil {
-		return
-	}
-	_logger.Errorf(s, a...)
-}
-
-// ============ Outer ============
-
-func SetLogger(logger *logrus.Logger) {
-	_logger = logger
-}
+var _store = NewSessionStore()
 
 func GetSession(id string) *Session {
 	return _store.GetSession(id)
@@ -59,6 +20,8 @@ func GetSessions() map[string]*Session {
 func CountSessions() int {
 	return _store.CountSessions()
 }
+
+// ============ Message ============
 
 func Address(ton byte, npi byte, addr string) pdu.Address {
 	ret := pdu.NewAddress()
@@ -73,17 +36,17 @@ func Message(s string) pdu.ShortMessage {
 	return sm
 }
 
-func MessageInGsm7bit(s string) pdu.ShortMessage {
+func Gsm7bitMessage(s string) pdu.ShortMessage {
 	sm, _ := pdu.NewShortMessageWithEncoding(s, data.GSM7BIT)
 	return sm
 }
 
-func MessageInUcs2(s string) pdu.ShortMessage {
+func Ucs2Message(s string) pdu.ShortMessage {
 	sm, _ := pdu.NewShortMessageWithEncoding(s, data.UCS2)
 	return sm
 }
 
-func MessageInBinary(s []byte) pdu.ShortMessage {
+func BinaryMessage(s []byte) pdu.ShortMessage {
 	sm, _ := pdu.NewBinaryShortMessageWithEncoding(s, data.BINARY8BIT2)
 	return sm
 }

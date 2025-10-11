@@ -1,4 +1,4 @@
-package smpp
+package assit
 
 import (
 	"fmt"
@@ -6,11 +6,14 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/yyliziqiu/smpp/smpp"
+	"github.com/yyliziqiu/smpp/util"
 )
 
 type SessionGroup struct {
 	conf      *SessionGroupConfig
-	sessions  map[string]*Session
+	sessions  map[string]*smpp.Session
 	keys      []string
 	round     int32
 	adjusting int32
@@ -19,18 +22,18 @@ type SessionGroup struct {
 }
 
 type SessionGroupConfig struct {
-	GroupId  string                                     // 会话组 ID
-	Capacity int                                        // 会话组中最大会话数量
-	AutoFill bool                                       // 是否自动创建会话
-	Values   any                                        // AutoFill 为 true 时，用来自定义用户数据
-	Create   func(*SessionGroup, any) (*Session, error) // AutoFill 为 true 时，用来自动创建会话
-	Failed   func(*SessionGroup, error)                 // AutoFill 为 true 时，自动创建会话失败时执行
+	GroupId  string                                          // 会话组 ID
+	Capacity int                                             // 会话组中最大会话数量
+	AutoFill bool                                            // 是否自动创建会话
+	Values   any                                             // AutoFill 为 true 时，用来自定义用户数据
+	Create   func(*SessionGroup, any) (*smpp.Session, error) // AutoFill 为 true 时，用来自动创建会话
+	Failed   func(*SessionGroup, error)                      // AutoFill 为 true 时，自动创建会话失败时执行
 }
 
 func NewSessionGroup(conf *SessionGroupConfig) *SessionGroup {
 	return &SessionGroup{
 		conf:     conf,
-		sessions: make(map[string]*Session),
+		sessions: make(map[string]*smpp.Session),
 	}
 }
 
@@ -54,8 +57,8 @@ func (g *SessionGroup) len() int {
 }
 
 // Round 轮询获取会话组中的会话
-func (g *SessionGroup) Round() *Session {
-	var sess *Session
+func (g *SessionGroup) Round() *smpp.Session {
+	var sess *smpp.Session
 
 	g.mu.RLock()
 	n := int32(g.len())
@@ -69,7 +72,7 @@ func (g *SessionGroup) Round() *Session {
 }
 
 // Get 获取会话组中指定会话
-func (g *SessionGroup) Get(sessionId string) *Session {
+func (g *SessionGroup) Get(sessionId string) *smpp.Session {
 	g.mu.RLock()
 	sess := g.sessions[sessionId]
 	g.mu.RUnlock()
@@ -78,7 +81,7 @@ func (g *SessionGroup) Get(sessionId string) *Session {
 }
 
 // All 获取会话组所有会话
-func (g *SessionGroup) All() []*Session {
+func (g *SessionGroup) All() []*smpp.Session {
 	g.mu.RLock()
 	list := maps.Values(g.sessions)
 	g.mu.RUnlock()
@@ -87,7 +90,7 @@ func (g *SessionGroup) All() []*Session {
 }
 
 // Add 向会话组中添加一个会话
-func (g *SessionGroup) Add(sess *Session) error {
+func (g *SessionGroup) Add(sess *smpp.Session) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -108,15 +111,15 @@ func (g *SessionGroup) full() bool {
 	return len(g.keys) >= g.conf.Capacity
 }
 
-func (g *SessionGroup) add(sess *Session) {
+func (g *SessionGroup) add(sess *smpp.Session) {
 	g.sessions[sess.Id()] = sess
 	g.keys = maps.Keys(g.sessions)
-	logInfo("[SessionGroup@%s] Add session, session id: %s", g.Id(), sess.Id())
+	util.LogInfo("[SessionGroup@%s] Add session, session id: %s", g.Id(), sess.Id())
 }
 
 // Del 从会话组中删除一个会话
 func (g *SessionGroup) Del(sessionId string) {
-	var sess *Session
+	var sess *smpp.Session
 
 	g.mu.Lock()
 	if !g.destroyed {
@@ -130,14 +133,14 @@ func (g *SessionGroup) Del(sessionId string) {
 	}
 }
 
-func (g *SessionGroup) del(sessionId string) *Session {
+func (g *SessionGroup) del(sessionId string) *smpp.Session {
 	sess, ok := g.sessions[sessionId]
 	if ok {
 		delete(g.sessions, sessionId)
 		g.keys = maps.Keys(g.sessions)
-		logInfo("[SessionGroup@%s] Del session, session id: %s", g.Id(), sess.Id())
+		util.LogInfo("[SessionGroup@%s] Del session, session id: %s", g.Id(), sess.Id())
 	} else {
-		logDebug("[SessionGroup@%s] Del not exit session, session id: %s", g.Id(), sessionId)
+		util.LogDebug("[SessionGroup@%s] Del not exit session, session id: %s", g.Id(), sessionId)
 	}
 	return sess
 }
@@ -178,10 +181,10 @@ func (g *SessionGroup) create() {
 		if g.conf.Failed != nil {
 			g.conf.Failed(g, err)
 		}
-		logWarn("[SessionGroup@%s] Create session failed, error: %v", g.Id(), err)
+		util.LogWarn("[SessionGroup@%s] Create session failed, error: %v", g.Id(), err)
 		return
 	}
-	logInfo("[SessionGroup@%s] Create session, session id: %s", g.Id(), sess.Id())
+	util.LogInfo("[SessionGroup@%s] Create session, session id: %s", g.Id(), sess.Id())
 
 	closed := false
 	g.mu.Lock()
@@ -194,12 +197,12 @@ func (g *SessionGroup) create() {
 
 	if closed {
 		sess.Close()
-		logInfo("[SessionGroup@%s] Close session in create, session id: %s", g.Id(), sess.Id())
+		util.LogInfo("[SessionGroup@%s] Close session in create, session id: %s", g.Id(), sess.Id())
 		return
 	}
 }
 
-func (g *SessionGroup) remove() *Session {
+func (g *SessionGroup) remove() *smpp.Session {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -227,10 +230,10 @@ func (g *SessionGroup) Destroy() {
 	for _, session := range g.destroy() {
 		session.Close()
 	}
-	logInfo("[SessionGroup@%s] Destroy", g.Id())
+	util.LogInfo("[SessionGroup@%s] Destroy", g.Id())
 }
 
-func (g *SessionGroup) destroy() []*Session {
+func (g *SessionGroup) destroy() []*smpp.Session {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
