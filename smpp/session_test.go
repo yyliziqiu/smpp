@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/slog"
 	"github.com/yyliziqiu/slib/suid"
@@ -69,8 +70,8 @@ var (
 	}
 
 	_serverConnectionConfig = ServerConnectionConfig{
-		Authenticate: func(systemId string, password string) bool {
-			return systemId == "user1" && password == "user1"
+		Authenticate: func(systemId string, password string) data.CommandStatusType {
+			return data.ESME_ROK
 		},
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Second,
@@ -138,7 +139,7 @@ func TestServerSession(t *testing.T) {
 }
 
 func accept(conn net.Conn) {
-	connect := NewServerConnection(conn, _serverConnectionConfig)
+	serv := NewServerConnection(conn, _serverConnectionConfig)
 
 	conf := SessionConfig{
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
@@ -162,7 +163,7 @@ func accept(conn net.Conn) {
 		},
 	}
 
-	sess, err := NewSession(connect, conf)
+	sess, err := NewSession(serv, conf)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return

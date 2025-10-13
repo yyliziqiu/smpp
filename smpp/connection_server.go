@@ -17,10 +17,12 @@ type ServerConnection struct {
 }
 
 type ServerConnectionConfig struct {
-	Authenticate Authenticate
+	Authenticate ServerConnectionAuthenticate
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 }
+
+type ServerConnectionAuthenticate func(systemId string, password string) data.CommandStatusType
 
 func NewServerConnection(conn net.Conn, conf ServerConnectionConfig) *ServerConnection {
 	return &ServerConnection{conn: conn, conf: &conf}
@@ -57,26 +59,24 @@ func (c *ServerConnection) Dial() error {
 	}
 
 	if !ok {
+		_ = c.conn.Close()
 		return ErrBindFailed
 	}
 
 	c.bindType = br.BindingType
 	c.systemId = br.SystemID
 
-	pass := c.conf.Authenticate(br.SystemID, br.Password)
+	status := c.conf.Authenticate(br.SystemID, br.Password)
 
 	brp := br.GetResponse().(*pdu.BindResp)
-	if !pass {
-		brp.Header.CommandStatus = data.ESME_RBINDFAIL
-	}
-
+	brp.Header.CommandStatus = status
 	_, err := c.Write(brp)
 	if err != nil {
 		_ = c.conn.Close()
 		return err
 	}
 
-	if !pass {
+	if status != data.ESME_ROK {
 		_ = c.conn.Close()
 		return ErrAuthFailed
 	}

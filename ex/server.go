@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/suid"
 
@@ -30,10 +31,10 @@ func StartServer() {
 
 func accept(conn net.Conn) {
 	// create server connection
-	connect := smpp.NewServerConnection(conn, smpp.ServerConnectionConfig{
+	serv := smpp.NewServerConnection(conn, smpp.ServerConnectionConfig{
 		// invoked when a new connection coming
-		Authenticate: func(systemId string, password string) bool {
-			return systemId == "user1" && password == "user1"
+		Authenticate: func(systemId string, password string) data.CommandStatusType {
+			return data.ESME_ROK
 		},
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Second,
@@ -62,7 +63,7 @@ func accept(conn net.Conn) {
 	}
 
 	// create session
-	sess, err := smpp.NewSession(connect, conf)
+	sess, err := smpp.NewSession(serv, conf)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
