@@ -22,7 +22,7 @@ type ServerConnectionConfig struct {
 	WriteTimeout time.Duration
 }
 
-type ServerConnectionAuthenticate func(systemId string, password string) data.CommandStatusType
+type ServerConnectionAuthenticate func(conn *ServerConnection, systemId string, password string) data.CommandStatusType
 
 func NewServerConnection(conn net.Conn, conf ServerConnectionConfig) *ServerConnection {
 	return &ServerConnection{conn: conn, conf: &conf}
@@ -66,7 +66,7 @@ func (c *ServerConnection) Dial() error {
 	c.bindType = br.BindingType
 	c.systemId = br.SystemID
 
-	status := c.conf.Authenticate(br.SystemID, br.Password)
+	status := c.conf.Authenticate(c, br.SystemID, br.Password)
 
 	brp := br.GetResponse().(*pdu.BindResp)
 	brp.Header.CommandStatus = status

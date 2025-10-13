@@ -33,7 +33,7 @@ func accept(conn net.Conn) {
 	// create server connection
 	serv := smpp.NewServerConnection(conn, smpp.ServerConnectionConfig{
 		// invoked when a new connection coming
-		Authenticate: func(systemId string, password string) data.CommandStatusType {
+		Authenticate: func(conn *smpp.ServerConnection, systemId string, password string) data.CommandStatusType {
 			return data.ESME_ROK
 		},
 		ReadTimeout:  30 * time.Second,

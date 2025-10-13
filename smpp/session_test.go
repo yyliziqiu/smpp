@@ -70,7 +70,7 @@ var (
 	}
 
 	_serverConnectionConfig = ServerConnectionConfig{
-		Authenticate: func(systemId string, password string) data.CommandStatusType {
+		Authenticate: func(conn *ServerConnection, systemId string, password string) data.CommandStatusType {
 			return data.ESME_ROK
 		},
 		ReadTimeout:  30 * time.Second,
@@ -174,6 +174,7 @@ func accept(conn net.Conn) {
 		_ = sess.Write(deliverSmPdu())
 	}
 
+	// 测试手动关闭
 	// time.Sleep(10 * time.Second)
-	// sess.Close() // 测试手动关闭
+	// sess.Close()
 }
