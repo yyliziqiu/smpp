@@ -45,7 +45,7 @@ func TestDlrTracer(t *testing.T) {
 		w.Put(&DlrNode{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
-			ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
+			ExpireAt:  time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 		})
 	}
 
@@ -97,7 +97,7 @@ func TestNewDlrTracer2(t *testing.T) {
 		w.Put(&DlrNode{
 			MessageId: suid.Get(),
 			SystemId:  "user1",
-			ExpiredAt: time.Now().Unix() + int64(i),
+			ExpireAt:  time.Now().Unix() + int64(i),
 		})
 	}
 

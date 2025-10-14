@@ -21,7 +21,7 @@ func StartDlrTracer() {
 	t.Put(&assist.DlrNode{
 		MessageId: suid.Get(),
 		SystemId:  "user1",
-		ExpiredAt: time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
+		ExpireAt:  time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 	})
 
 	// take the session by message id to send dlr to client
