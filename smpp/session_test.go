@@ -110,7 +110,7 @@ func TestClientSession(t *testing.T) {
 	}()
 
 	for i := 0; i < 2; i++ {
-		if err = sess.Write(submitSmPdu()); err != nil {
+		if err = sess.Write(submitSmPdu(), "123456"); err != nil {
 			t.Error(err)
 		}
 		time.Sleep(time.Second)
@@ -171,7 +171,7 @@ func accept(conn net.Conn) {
 
 	// 测试写
 	for i := 0; i < 3; i++ {
-		_ = sess.Write(deliverSmPdu())
+		_ = sess.Write(deliverSmPdu(), nil)
 	}
 
 	// 测试手动关闭
