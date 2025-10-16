@@ -46,7 +46,7 @@ func StartClient() {
 		},
 		// invoked before submit the pdu, you can get an auto-assigned message id of the submitted pdu
 		OnRequest: func(sess *smpp.Session, req *smpp.Request) {
-			_ = req.MessageId
+
 		},
 		// invoked when received the responsive pdu
 		// or occurred error before submit
@@ -70,7 +70,7 @@ func StartClient() {
 	defer sess.Close()
 
 	// submit pdu by session
-	err = sess.Write(submitSmPdu())
+	err = sess.Write(submitSmPdu(), "123456")
 	if err != nil {
 		log.Println("Error: ", err)
 	}

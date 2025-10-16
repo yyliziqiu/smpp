@@ -51,9 +51,6 @@ type SessionConfig struct {
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
-	if conf.WindowSize == 0 {
-		conf.WindowSize = 1000
-	}
 	if conf.WindowWait == 0 {
 		conf.WindowWait = time.Minute
 	}
@@ -160,14 +157,14 @@ func (s *Session) read() bool {
 	switch p.(type) {
 	case *pdu.EnquireLink:
 		util.LogDebug("[Session@%s:%s] Received enquire link pdu", s.id, s.SystemId())
-		s.writeToQueue(p.GetResponse(), SubmitterSys)
+		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
 		return false
 	case *pdu.EnquireLinkResp:
 		s.term.window.Take(p.GetSequenceNumber())
 		return false
 	case *pdu.Unbind:
 		util.LogInfo("[Session@%s:%s] Received unbind pdu", s.id, s.SystemId())
-		s.writeToQueue(p.GetResponse(), SubmitterSys)
+		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
 		s.close(CloseByPdu, "received unbind")
 		return true
 	case *pdu.UnbindResp:
@@ -189,7 +186,7 @@ func (s *Session) read() bool {
 	if p.CanResponse() {
 		rp := s.onReceive(p)
 		if rp != nil {
-			s.writeToQueue(rp, SubmitterSys)
+			s.writeToQueue(SubmitterSys, rp, nil)
 		}
 	} else {
 		tr := s.term.window.Take(p.GetSequenceNumber())
@@ -266,17 +263,16 @@ func (s *Session) allowRead(p pdu.PDU) bool {
 	return true
 }
 
-func (s *Session) writeToQueue(p pdu.PDU, submitter int8) {
-	s.term.rqChan <- s.newRequest(p, submitter)
+func (s *Session) writeToQueue(submitter int8, p pdu.PDU, data any) {
+	s.term.rqChan <- s.newRequest(submitter, p, data)
 }
 
-func (s *Session) newRequest(p pdu.PDU, submitter int8) *Request {
+func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
 	return &Request{
 		Pdu:       p,
+		TraceData: data,
 		SessionId: s.id,
-		MessageId: suid.Get(),
 		SystemId:  s.conn.SystemId(),
-		CreateAt:  time.Now().Unix(),
 		SubmitAt:  0,
 		submitter: submitter,
 	}
@@ -317,7 +313,7 @@ func (s *Session) loopWrite() {
 						return
 					}
 				case <-t.C:
-					if s.write(s.newRequest(pdu.NewEnquireLink(), SubmitterSys)) {
+					if s.write(s.newRequest(SubmitterSys, pdu.NewEnquireLink(), nil)) {
 						s.logLoopWriteStop()
 						return
 					}
@@ -482,12 +478,12 @@ func (s *Session) SetContext(ctx any) {
 	s.conf.Context = ctx
 }
 
-func (s *Session) Write(p pdu.PDU) error {
+func (s *Session) Write(p pdu.PDU, data any) error {
 	if atomic.LoadInt32(&s.status) == SessionClosed {
 		return ErrSessionClosed
 	}
 
-	s.writeToQueue(p, SubmitterUser)
+	s.writeToQueue(SubmitterUser, p, data)
 
 	return nil
 }

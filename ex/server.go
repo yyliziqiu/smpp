@@ -70,7 +70,7 @@ func accept(conn net.Conn) {
 	}
 
 	// deliver pdu to client
-	_ = sess.Write(deliverSmPdu())
+	_ = sess.Write(deliverSmPdu(), nil)
 }
 
 func deliverSmPdu() *pdu.DeliverSM {
