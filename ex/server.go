@@ -11,6 +11,7 @@ import (
 	"github.com/yyliziqiu/slib/suid"
 
 	"github.com/yyliziqiu/smpp/smpp"
+	"github.com/yyliziqiu/smpp/util"
 )
 
 func StartServer() {
@@ -45,6 +46,7 @@ func accept(conn net.Conn) {
 	// set session config
 	conf := smpp.SessionConfig{
 		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
+			util.PrintPdu("received", sess.SystemId(), p)
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
@@ -57,10 +59,10 @@ func accept(conn net.Conn) {
 			return nil
 		},
 		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
-
+			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *smpp.Session, reason string, desc string) {
-
+			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
 		},
 	}
 
@@ -72,7 +74,10 @@ func accept(conn net.Conn) {
 	}
 
 	// deliver pdu to client
-	_ = sess.Write(deliverSmPdu(), nil)
+	time.Sleep(3 * time.Second)
+	for i := 0; i < 2; i++ {
+		_ = sess.Write(deliverSmPdu(), nil)
+	}
 }
 
 func deliverSmPdu() *pdu.DeliverSM {

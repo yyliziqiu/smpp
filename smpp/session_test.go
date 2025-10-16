@@ -1,7 +1,6 @@
 package smpp
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -29,13 +28,6 @@ func prepare() {
 
 func finally(code int) {
 	os.Exit(code)
-}
-
-func printPdu(tag string, systemId string, p pdu.PDU) {
-	if p != nil {
-		bs, _ := json.MarshalIndent(p, "", "  ")
-		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
-	}
 }
 
 func submitSmPdu() *pdu.SubmitSM {
@@ -83,7 +75,7 @@ func TestClientSession(t *testing.T) {
 		EnquireLink: 60 * time.Second,
 		AttemptDial: 10 * time.Second,
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
-			printPdu("received", sess.SystemId(), p)
+			util.PrintPdu("received", sess.SystemId(), p)
 			if p.CanResponse() {
 				return p.GetResponse()
 			}
@@ -91,7 +83,7 @@ func TestClientSession(t *testing.T) {
 		},
 		OnRespond: func(sess *Session, resp *Response) {
 			// fmt.Println("user custom data: ", values)
-			printPdu("response", resp.Request.SystemId, resp.Pdu)
+			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
@@ -143,7 +135,7 @@ func accept(conn net.Conn) {
 
 	conf := SessionConfig{
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
-			printPdu("received", sess.SystemId(), p)
+			util.PrintPdu("received", sess.SystemId(), p)
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
@@ -156,7 +148,7 @@ func accept(conn net.Conn) {
 			return nil
 		},
 		OnRespond: func(sess *Session, resp *Response) {
-			printPdu("response", resp.Request.SystemId, resp.Pdu)
+			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)

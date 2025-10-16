@@ -1,10 +1,12 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"time"
 
+	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,4 +54,11 @@ func PrintMemory(tag string, gc bool) {
 	runtime.ReadMemStats(&memStats)
 
 	fmt.Printf("[memory:%s] alloc: %d KB\n", tag, memStats.Alloc/1024)
+}
+
+func PrintPdu(tag string, systemId string, p pdu.PDU) {
+	if p != nil {
+		bs, _ := json.MarshalIndent(p, "", "  ")
+		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
+	}
 }
