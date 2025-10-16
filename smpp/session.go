@@ -16,10 +16,10 @@ import (
 
 type Session struct {
 	id     string
+	store  *SessionStore
 	conn   Connection
 	conf   *SessionConfig
 	term   *SessionTerm
-	store  *SessionStore
 	status int32
 	closed int32
 	initAt time.Time
@@ -51,6 +51,9 @@ type SessionConfig struct {
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
+	if conf.WindowSize == 0 {
+		conf.WindowSize = 64
+	}
 	if conf.WindowWait == 0 {
 		conf.WindowWait = time.Minute
 	}
@@ -60,10 +63,10 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 
 	s := &Session{
 		id:     suid.Get(),
+		store:  _store,
 		conn:   conn,
 		conf:   &conf,
 		term:   nil,
-		store:  _store,
 		status: SessionClosed,
 		closed: 0,
 		initAt: time.Now(),
