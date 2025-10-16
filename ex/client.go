@@ -11,6 +11,7 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 
 	"github.com/yyliziqiu/smpp/smpp"
+	"github.com/yyliziqiu/smpp/util"
 )
 
 func StartClient() {
@@ -28,7 +29,7 @@ func StartClient() {
 		// custom user data
 		Context: 1,
 		// heartbeat interval
-		EnquireLink: 60 * time.Second,
+		EnquireLink: 15 * time.Second,
 		// redial interval, session will auto redial when the tcp connection is broke if the AttemptDial > 0
 		AttemptDial: 5 * time.Second,
 		// when the window size is large or request timeout is small, set the WindowType = 1
@@ -39,14 +40,11 @@ func StartClient() {
 		// WindowWait: 300 * time.Second,
 		// invoked when received the non-responsive pdu
 		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
+			util.PrintPdu("received", sess.SystemId(), p)
 			if p.CanResponse() {
 				return p.GetResponse()
 			}
 			return nil
-		},
-		// invoked before submit the pdu, you can get an auto-assigned message id of the submitted pdu
-		OnRequest: func(sess *smpp.Session, req *smpp.Request) {
-
 		},
 		// invoked when received the responsive pdu
 		// or occurred error before submit
@@ -54,7 +52,7 @@ func StartClient() {
 		//
 		// the Response.Pdu must be nil if the TResponse.Error is not nil
 		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
-
+			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		// invoked after the session is closed
 		OnClosed: func(sess *smpp.Session, reason string, desc string) {
