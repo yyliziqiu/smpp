@@ -60,7 +60,7 @@ func (w *MapWindow) Take(sequence int32) *Request {
 }
 
 func (w *MapWindow) TakeTimeout() []*Request {
-	requests := make([]*Request, 0, w.size/5)
+	requests := make([]*Request, 0, 8)
 
 	w.mu.Lock()
 	curr := time.Now().Unix()
@@ -146,7 +146,7 @@ func (w *QueueWindow) take(sequence int32) *Request {
 }
 
 func (w *QueueWindow) TakeTimeout() []*Request {
-	list := make([]*Request, 0, w.size/5)
+	list := make([]*Request, 0, 16)
 	curr := time.Now().Unix()
 
 	w.mu.Lock()

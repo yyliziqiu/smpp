@@ -105,7 +105,7 @@ type DlrNode struct {
 	MessageId string `json:"m"`
 	SystemId  string `json:"s"`
 	ExpireAt  int64  `json:"e"`
-	took      int
+	took      int8
 }
 
 func (h *DlrHeap) Len() int {
