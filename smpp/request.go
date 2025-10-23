@@ -4,8 +4,8 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 )
 
-// Request transmit pdu
 type Request struct {
+	// submitted pdu
 	Pdu pdu.PDU
 
 	// trace info
