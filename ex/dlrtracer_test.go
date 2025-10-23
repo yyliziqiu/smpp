@@ -1,4 +1,4 @@
-package assist
+package ex
 
 import (
 	"context"

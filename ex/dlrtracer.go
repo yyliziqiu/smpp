@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/yyliziqiu/slib/suid"
-
-	"github.com/yyliziqiu/smpp/assist"
 )
 
 func StartDlrTracer() {
@@ -15,10 +13,10 @@ func StartDlrTracer() {
 	wait := time.Minute
 
 	// create a tracer
-	t := assist.NewDlrTracer(size)
+	t := NewDlrTracer(size)
 
 	// put the message id to tracer for dlr trace
-	t.Put(&assist.DlrNode{
+	t.Put(&DlrNode{
 		MessageId: suid.Get(),
 		SystemId:  "user1",
 		ExpireAt:  time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),

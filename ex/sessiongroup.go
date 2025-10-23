@@ -2,108 +2,156 @@ package ex
 
 import (
 	"fmt"
-	"time"
+	"sync"
+	"sync/atomic"
 
-	"github.com/linxGnu/gosmpp/pdu"
+	"golang.org/x/exp/maps"
 
-	"github.com/yyliziqiu/smpp/assist"
 	"github.com/yyliziqiu/smpp/smpp"
 )
 
-func SessionGroupExample() {
-	group := assist.NewSessionGroup(&assist.SessionGroupConfig{
-		GroupId:  "group1",
-		Capacity: 3,
-		AutoFill: true,
-		Values:   "test group1",
-		Create: func(group *assist.SessionGroup, val any) (*smpp.Session, error) {
-			fmt.Println("create session: ", val)
-			return newSessionForGroup(group)
-		},
-		Failed: func(group *assist.SessionGroup, err error) {
-			fmt.Println("Error: ", err)
-		},
-	})
+type SessionGroup struct {
+	cap       int
+	list      map[string]*smpp.Session
+	keys      []string
+	next      int32
+	destroyed bool
+	mu        sync.RWMutex
+}
 
-	sess, _ := newSessionForGroup(group)
-	err := group.Add(sess)
-	if err != nil {
+func NewSessionGroup(cap int) *SessionGroup {
+	return &SessionGroup{
+		cap:  cap,
+		list: make(map[string]*smpp.Session),
+	}
+}
+
+// Len 获取会话组中的会话数量
+func (g *SessionGroup) Len() int {
+	return g.len()
+}
+
+func (g *SessionGroup) len() int {
+	return len(g.keys)
+}
+
+// Get 获取会话组中指定会话
+func (g *SessionGroup) Get(sessionId string) (*smpp.Session, bool) {
+	g.mu.RLock()
+	sess, ok := g.list[sessionId]
+	g.mu.RUnlock()
+
+	return sess, ok
+}
+
+// GetAll 获取会话组所有会话
+func (g *SessionGroup) GetAll() []*smpp.Session {
+	g.mu.RLock()
+	list := maps.Values(g.list)
+	g.mu.RUnlock()
+
+	return list
+}
+
+// Next 轮询获取会话组中的会话
+func (g *SessionGroup) Next() (*smpp.Session, bool) {
+	var sess *smpp.Session
+
+	g.mu.RLock()
+	n := int32(g.len())
+	if n > 0 {
+		i := atomic.AddInt32(&g.next, 1) & 0x7FFFFFFF
+		sess = g.list[g.keys[i%n]]
+	}
+	g.mu.RUnlock()
+
+	return sess, n > 0
+}
+
+// Add 向会话组中添加一个会话
+func (g *SessionGroup) Add(sess *smpp.Session) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.destroyed {
+		return fmt.Errorf("session group has be destroyed")
+	}
+
+	if g.len() >= g.cap {
+		return fmt.Errorf("session group has be full")
+	}
+
+	g.list[sess.Id()] = sess
+
+	g.keys = maps.Keys(g.list)
+
+	return nil
+}
+
+// Del 从会话组中删除一个会话
+func (g *SessionGroup) Del(sessionId string) {
+	g.mu.Lock()
+	sess := g.del(sessionId)
+	g.mu.Unlock()
+
+	if sess != nil {
 		sess.Close()
 	}
-
-	group.Del("session id")
-
-	group.Adjust()
-
-	group.Destroy()
 }
 
-func newSessionForGroup(group *assist.SessionGroup) (*smpp.Session, error) {
-	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
-		Smsc:     "127.0.0.1:10088",
-		SystemId: "user1",
-		Password: "user1",
-		BindType: pdu.Transceiver,
-	})
-
-	conf := smpp.SessionConfig{
-		EnquireLink: 30 * time.Second,
-		AttemptDial: 10 * time.Second,
-		OnClosed: func(sess *smpp.Session, reason string, desc string) {
-			group.Del(sess.Id())
-			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
-		},
+func (g *SessionGroup) del(sessionId string) *smpp.Session {
+	sess, ok := g.list[sessionId]
+	if ok {
+		delete(g.list, sessionId)
+		g.keys = maps.Keys(g.list)
 	}
 
-	return smpp.NewSession(conn, conf)
+	return sess
 }
 
-func SessionGroupManagerExample() {
-	manager := assist.NewSessionGroupManager(assist.SessionGroupManagerConfig{
-		AdjustInterval: 5 * time.Second,
-	})
+// Destroy 销毁会话组，并关闭会话组中的所有会话
+func (g *SessionGroup) Destroy() {
+	g.mu.Lock()
 
-	err := manager.Register(newSessionGroupConfigForManager("group1"))
-	if err != nil {
-		panic(err)
+	if g.destroyed {
+		g.mu.Unlock()
+		return
 	}
 
-	time.Sleep(3 * time.Second)
+	sessions := maps.Values(g.list)
 
-	sg := manager.Get("group1")
+	g.list = nil
+	g.keys = nil
+	g.destroyed = true
 
-	sg.Del("session id")
+	g.mu.Unlock()
 
-	manager.Unregister("group1")
-
-	time.Sleep(3 * time.Second)
+	for _, sess := range sessions {
+		sess.Close()
+	}
 }
 
-func newSessionGroupConfigForManager(id string) assist.SessionGroupConfig {
-	return assist.SessionGroupConfig{
-		GroupId:  id,
-		Capacity: 3,
-		AutoFill: true,
-		Values:   "test group1",
-		Create: func(group *assist.SessionGroup, val any) (*smpp.Session, error) {
-			fmt.Println("create session: ", val)
-			conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
-				Smsc:     "127.0.0.1:10088",
-				SystemId: "user1",
-				Password: "user1",
-				BindType: pdu.Transceiver,
-			})
-			return smpp.NewSession(conn, smpp.SessionConfig{
-				EnquireLink: 30 * time.Second,
-				AttemptDial: 10 * time.Second,
-				OnClosed: func(sess *smpp.Session, reason string, desc string) {
-					group.Del(sess.Id())
-					fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
-				},
-			})
-		},
-		Failed: func(group *assist.SessionGroup, err error) {
-			fmt.Println("Error: ", err)
-		},
+// SetCap 设置会话组容量
+func (g *SessionGroup) SetCap(cap int) {
+	g.mu.Lock()
+
+	g.cap = cap
+
+	if g.destroyed {
+		g.mu.Unlock()
+		return
+	}
+
+	var deleted []*smpp.Session
+	for i := g.len() - g.cap; i > 0; i-- {
+		if len(g.keys) > 0 {
+			deleted = append(deleted, g.del(g.keys[0]))
+		}
+	}
+
+	g.mu.Unlock()
+
+	for _, sess := range deleted {
+		sess.Close()
 	}
 }
