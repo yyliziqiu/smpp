@@ -41,6 +41,14 @@ func (c *ServerConnection) PeerAddr() string {
 }
 
 func (c *ServerConnection) Dial() error {
+	err := c.dial()
+	if err != nil {
+		_ = c.conn.Close()
+	}
+	return err
+}
+
+func (c *ServerConnection) dial() error {
 	c.peerAddr = c.conn.RemoteAddr().String()
 
 	var (
@@ -59,7 +67,6 @@ func (c *ServerConnection) Dial() error {
 	}
 
 	if !ok {
-		_ = c.conn.Close()
 		return ErrBindFailed
 	}
 
@@ -72,12 +79,10 @@ func (c *ServerConnection) Dial() error {
 	brp.Header.CommandStatus = status
 	_, err := c.Write(brp)
 	if err != nil {
-		_ = c.conn.Close()
 		return err
 	}
 
 	if status != data.ESME_ROK {
-		_ = c.conn.Close()
 		return ErrAuthFailed
 	}
 

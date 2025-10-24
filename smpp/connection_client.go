@@ -134,6 +134,7 @@ func (c *ClientConnection) Write(p pdu.PDU) (int, error) {
 
 func (c *ClientConnection) Close() error {
 	_, _ = c.Write(pdu.NewUnbind())
+	time.Sleep(100 * time.Millisecond) // 防止对端响应时 reset
 	return c.conn.Close()
 }
 

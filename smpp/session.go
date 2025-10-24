@@ -168,11 +168,11 @@ func (s *Session) read() bool {
 	case *pdu.Unbind:
 		util.LogInfo("[Session@%s:%s] Received unbind pdu", s.id, s.SystemId())
 		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
-		s.close(CloseByPdu, "received unbind")
+		s.close(CloseByPdu, "received unbind pdu")
 		return true
 	case *pdu.UnbindResp:
 		util.LogInfo("[Session@%s:%s] Received unbind resp pdu", s.id, s.SystemId())
-		s.close(CloseByPdu, "received unbind response")
+		s.close(CloseByPdu, "received unbind response pdu")
 		return true
 	case *pdu.BindRequest:
 		return false
