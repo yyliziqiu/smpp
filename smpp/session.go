@@ -407,6 +407,9 @@ func (s *Session) loopClear() {
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
+					if s.status == ConnectionClosed {
+						break
+					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 				}
 				util.LogDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
