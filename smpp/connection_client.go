@@ -40,8 +40,18 @@ func (c *ClientConnection) BindType() pdu.BindingType {
 	return c.conf.BindType
 }
 
+func (c *ClientConnection) LocalAddr() string {
+	if c.conn == nil {
+		return ""
+	}
+	return c.conn.LocalAddr().String()
+}
+
 func (c *ClientConnection) PeerAddr() string {
-	return c.conf.Smsc
+	if c.conn == nil {
+		return ""
+	}
+	return c.conn.RemoteAddr().String()
 }
 
 func (c *ClientConnection) Dial() error {

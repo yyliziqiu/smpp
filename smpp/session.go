@@ -457,6 +457,10 @@ func (s *Session) BindType() pdu.BindingType {
 	return s.conn.BindType()
 }
 
+func (s *Session) LocalAddr() string {
+	return s.conn.LocalAddr()
+}
+
 func (s *Session) PeerAddr() string {
 	return s.conn.PeerAddr()
 }
