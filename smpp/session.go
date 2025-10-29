@@ -339,7 +339,7 @@ func (s *Session) write(request *Request) bool {
 		return true
 	}
 
-	if s.closed == 1 {
+	if s.status == ConnectionClosed {
 		s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 		return true
 	}
@@ -401,6 +401,9 @@ func (s *Session) loopClear() {
 				util.LogDebug("[Session@%s:%s] Loop window exit", s.id, s.SystemId())
 				return
 			case <-t.C:
+				if s.status == ConnectionClosed {
+					break
+				}
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
