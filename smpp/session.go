@@ -15,14 +15,14 @@ import (
 )
 
 type Session struct {
-	id     string
-	store  *SessionStore
-	conn   Connection
-	conf   *SessionConfig
-	term   *SessionTerm
-	status int32
-	closed int32
-	initAt time.Time
+	id     string         //
+	store  *SessionStore  //
+	conn   Connection     //
+	conf   *SessionConfig //
+	term   *SessionTerm   //
+	status int32          // 连接状态
+	closed int32          // 会话是否被显示关闭
+	initAt time.Time      //
 }
 
 type SessionTerm struct {
@@ -30,7 +30,7 @@ type SessionTerm struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	window Window
-	rqChan chan *Request
+	reqCh  chan *Request
 	dialAt time.Time
 }
 
@@ -96,7 +96,7 @@ func (s *Session) dial() error {
 		ctx:    ctx,
 		cancel: cancel,
 		window: s.newWindow(),
-		rqChan: make(chan *Request, 1),
+		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
 	s.term.wg.Add(3)
@@ -222,8 +222,8 @@ func (s *Session) close(reason string, desc string) {
 		_ = s.conn.Close()
 
 		// 清理会话数据
-		close(s.term.rqChan)
-		for request := range s.term.rqChan {
+		close(s.term.reqCh)
+		for request := range s.term.reqCh {
 			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
 		}
 		s.term.window = nil
@@ -267,7 +267,7 @@ func (s *Session) allowRead(p pdu.PDU) bool {
 }
 
 func (s *Session) writeToQueue(submitter int8, p pdu.PDU, data any) {
-	s.term.rqChan <- s.newRequest(submitter, p, data)
+	s.term.reqCh <- s.newRequest(submitter, p, data)
 }
 
 func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
@@ -290,7 +290,7 @@ func (s *Session) loopWrite() {
 				case <-s.term.ctx.Done():
 					s.logLoopWriteExit()
 					return
-				case r := <-s.term.rqChan:
+				case r := <-s.term.reqCh:
 					if s.write(r) {
 						s.logLoopWriteStop()
 						return
@@ -310,7 +310,7 @@ func (s *Session) loopWrite() {
 				case <-s.term.ctx.Done():
 					s.logLoopWriteExit()
 					return
-				case r := <-s.term.rqChan:
+				case r := <-s.term.reqCh:
 					if s.write(r) {
 						s.logLoopWriteStop()
 						return
@@ -449,10 +449,6 @@ func (s *Session) Id() string {
 	return s.id
 }
 
-func (s *Session) Status() int32 {
-	return atomic.LoadInt32(&s.status)
-}
-
 func (s *Session) SystemId() string {
 	return s.conn.SystemId()
 }
@@ -497,5 +493,7 @@ func (s *Session) Close() {
 }
 
 func (s *Session) Closed() bool {
-	return atomic.LoadInt32(&s.closed) == 1
+	c1 := atomic.LoadInt32(&s.closed) == 1                                           // 显示关闭会话
+	c2 := s.conf.AttemptDial == 0 && atomic.LoadInt32(&s.status) == ConnectionClosed // 或连接已关闭并且没有开启重连
+	return c1 || c2
 }
