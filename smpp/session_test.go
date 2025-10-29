@@ -30,49 +30,16 @@ func finally(code int) {
 	os.Exit(code)
 }
 
-func submitSmPdu() *pdu.SubmitSM {
-	p := pdu.NewSubmitSM().(*pdu.SubmitSM)
-	p.SourceAddr = Address(5, 0, "matrix")
-	p.DestAddr = Address(1, 1, "6281339900520")
-	p.Message = Message("68526b7e01614899")
-	p.RegisteredDelivery = 1
-	return p
-}
-
-func deliverSmPdu() *pdu.DeliverSM {
-	dlr := Dlr{
-		Id:    suid.Get(),
-		Sub:   "001",
-		Dlvrd: "001",
-		Sd:    time.Now(),
-		Dd:    time.Now(),
-		Stat:  "DELIVRD",
-		Err:   "000",
-		Text:  "success",
-	}
-	return dlr.Pdu("6281339900520", "matrix")
-}
-
-var (
-	_clientConnectionConfig = ClientConnectionConfig{
-		Smsc:     "127.0.0.1:10088",
-		SystemId: "user1",
-		Password: "user1",
+func TestClientSession(t *testing.T) {
+	cc := ClientConnectionConfig{
+		Smsc:     "127.0.0.1:10032",
+		SystemId: "test_user",
+		Password: "test_user",
 		BindType: pdu.Transceiver,
 	}
 
-	_serverConnectionConfig = ServerConnectionConfig{
-		Authenticate: func(conn *ServerConnection, systemId string, password string) data.CommandStatusType {
-			return data.ESME_ROK
-		},
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 5 * time.Second,
-	}
-)
-
-func TestClientSession(t *testing.T) {
-	conf := SessionConfig{
-		EnquireLink: 60 * time.Second,
+	sc := SessionConfig{
+		EnquireLink: 10 * time.Second,
 		AttemptDial: 10 * time.Second,
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
 			util.PrintPdu("received", sess.SystemId(), p)
@@ -90,7 +57,7 @@ func TestClientSession(t *testing.T) {
 		},
 	}
 
-	sess, err := NewSession(NewClientConnection(_clientConnectionConfig), conf)
+	sess, err := NewSession(NewClientConnection(cc), sc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +76,15 @@ func TestClientSession(t *testing.T) {
 	}
 
 	time.Sleep(time.Hour)
+}
+
+func submitSmPdu() *pdu.SubmitSM {
+	p := pdu.NewSubmitSM().(*pdu.SubmitSM)
+	p.SourceAddr = Address(5, 0, "matrix")
+	p.DestAddr = Address(1, 1, "6281339900520")
+	p.Message = Message("68526b7e01614899")
+	p.RegisteredDelivery = 1
+	return p
 }
 
 func TestServerSession(t *testing.T) {
@@ -131,9 +107,15 @@ func TestServerSession(t *testing.T) {
 }
 
 func accept(conn net.Conn) {
-	serv := NewServerConnection(conn, _serverConnectionConfig)
+	cc := ServerConnectionConfig{
+		Authenticate: func(conn *ServerConnection, systemId string, password string) data.CommandStatusType {
+			return data.ESME_ROK
+		},
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
 
-	conf := SessionConfig{
+	sc := SessionConfig{
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
 			util.PrintPdu("received", sess.SystemId(), p)
 			switch p.(type) {
@@ -155,7 +137,7 @@ func accept(conn net.Conn) {
 		},
 	}
 
-	sess, err := NewSession(serv, conf)
+	sess, err := NewSession(NewServerConnection(conn, cc), sc)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
@@ -169,4 +151,18 @@ func accept(conn net.Conn) {
 	// 测试手动关闭
 	// time.Sleep(10 * time.Second)
 	// sess.Close()
+}
+
+func deliverSmPdu() *pdu.DeliverSM {
+	dlr := Dlr{
+		Id:    suid.Get(),
+		Sub:   "001",
+		Dlvrd: "001",
+		Sd:    time.Now(),
+		Dd:    time.Now(),
+		Stat:  "DELIVRD",
+		Err:   "000",
+		Text:  "success",
+	}
+	return dlr.Pdu("6281339900520", "matrix")
 }
