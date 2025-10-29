@@ -67,7 +67,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		conn:   conn,
 		conf:   &conf,
 		term:   nil,
-		status: SessionClosed,
+		status: ConnectionClosed,
 		closed: 0,
 		initAt: time.Now(),
 	}
@@ -81,7 +81,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 }
 
 func (s *Session) dial() error {
-	if atomic.LoadInt32(&s.status) == SessionActive {
+	if atomic.LoadInt32(&s.status) == ConnectionDialed {
 		return nil
 	}
 
@@ -101,7 +101,7 @@ func (s *Session) dial() error {
 	}
 	s.term.wg.Add(3)
 
-	atomic.StoreInt32(&s.status, SessionActive)
+	atomic.StoreInt32(&s.status, ConnectionDialed)
 
 	s.onDialed()
 
@@ -202,7 +202,7 @@ func (s *Session) read() bool {
 }
 
 func (s *Session) close(reason string, desc string) {
-	if !atomic.CompareAndSwapInt32(&s.status, SessionActive, SessionClosed) {
+	if !atomic.CompareAndSwapInt32(&s.status, ConnectionDialed, ConnectionClosed) {
 		return
 	}
 
@@ -340,7 +340,7 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	if s.closed == 1 {
-		s.onRespond(NewResponse(request, nil, ErrSessionClosed))
+		s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 		return true
 	}
 
@@ -482,8 +482,8 @@ func (s *Session) SetContext(ctx any) {
 }
 
 func (s *Session) Write(p pdu.PDU, data any) error {
-	if atomic.LoadInt32(&s.status) == SessionClosed {
-		return ErrSessionClosed
+	if atomic.LoadInt32(&s.status) == ConnectionClosed {
+		return ErrConnectionClosed
 	}
 
 	s.writeToQueue(SubmitterUser, p, data)
@@ -497,9 +497,5 @@ func (s *Session) Close() {
 }
 
 func (s *Session) Closed() bool {
-	return atomic.LoadInt32(&s.status) == SessionClosed
-}
-
-func (s *Session) ClosedExplicitly() bool {
 	return atomic.LoadInt32(&s.closed) == 1
 }

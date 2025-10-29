@@ -1,8 +1,8 @@
 package smpp
 
 const (
-	SessionActive int32 = iota
-	SessionClosed
+	ConnectionDialed int32 = iota
+	ConnectionClosed
 )
 
 const (
