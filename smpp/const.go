@@ -6,6 +6,12 @@ const (
 )
 
 const (
+	SessionDialing = "dialing"
+	SessionActive  = "active"
+	SessionClosed  = "closed"
+)
+
+const (
 	CloseByError    = "error"
 	CloseByPdu      = "pdu"
 	CloseByExplicit = "explicit"

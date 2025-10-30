@@ -507,3 +507,13 @@ func (s *Session) Closed() bool {
 	c2 := s.conf.AttemptDial == 0 && atomic.LoadInt32(&s.status) == ConnectionClosed // 或连接已关闭并且没有开启重连
 	return c1 || c2
 }
+
+func (s *Session) Status() string {
+	if s.Closed() {
+		return SessionClosed
+	}
+	if atomic.LoadInt32(&s.status) == ConnectionClosed {
+		return SessionDialing
+	}
+	return SessionActive
+}
