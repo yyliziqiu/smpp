@@ -13,6 +13,8 @@ type ServerConnection struct {
 	conn     net.Conn
 	systemId string
 	bindType pdu.BindingType
+	selfAddr string
+	peerAddr string
 }
 
 type ServerConnectionConfig struct {
@@ -35,18 +37,12 @@ func (c *ServerConnection) BindType() pdu.BindingType {
 	return c.bindType
 }
 
-func (c *ServerConnection) LocalAddr() string {
-	if c.conn == nil {
-		return ""
-	}
-	return c.conn.LocalAddr().String()
+func (c *ServerConnection) SelfAddr() string {
+	return c.selfAddr
 }
 
 func (c *ServerConnection) PeerAddr() string {
-	if c.conn == nil {
-		return ""
-	}
-	return c.conn.RemoteAddr().String()
+	return c.peerAddr
 }
 
 func (c *ServerConnection) Dial() error {
@@ -58,6 +54,13 @@ func (c *ServerConnection) Dial() error {
 }
 
 func (c *ServerConnection) dial() error {
+	if c.conn == nil {
+		return ErrConnectionIsNil
+	}
+
+	c.selfAddr = c.conn.LocalAddr().String()
+	c.peerAddr = c.conn.RemoteAddr().String()
+
 	var (
 		br *pdu.BindRequest
 		ok bool

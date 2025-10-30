@@ -40,7 +40,7 @@ func (c *ClientConnection) BindType() pdu.BindingType {
 	return c.conf.BindType
 }
 
-func (c *ClientConnection) LocalAddr() string {
+func (c *ClientConnection) SelfAddr() string {
 	if c.conn == nil {
 		return ""
 	}
@@ -49,7 +49,7 @@ func (c *ClientConnection) LocalAddr() string {
 
 func (c *ClientConnection) PeerAddr() string {
 	if c.conn == nil {
-		return ""
+		return c.conf.Smsc
 	}
 	return c.conn.RemoteAddr().String()
 }

@@ -9,7 +9,7 @@ import (
 type Connection interface {
 	SystemId() string
 	BindType() pdu.BindingType
-	LocalAddr() string
+	SelfAddr() string
 	PeerAddr() string
 	Dial() error
 	Read() (pdu.PDU, error)

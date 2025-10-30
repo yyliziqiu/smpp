@@ -15,6 +15,7 @@ var (
 	ErrConnectionClosed = errors.New("connection closed")
 	ErrChannelClosed    = errors.New("channel closed")
 	ErrResponseTimeout  = errors.New("response timeout")
+	ErrConnectionIsNil  = errors.New("connection is nil")
 )
 
 type StatusError struct {
