@@ -341,18 +341,25 @@ func (s *Session) write(request *Request) bool {
 		return true
 	}
 
+	// 若链接已关闭，则尽快结束此协程
 	if s.status == ConnectionClosed {
 		s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 		return true
 	}
 
+	// 判断 pdu 是否可以发送
 	if !s.allowWrite(request.Pdu) {
 		s.onRespond(NewResponse(request, nil, ErrNotAllowed))
 		return false
 	}
 
+	// 若窗口已满，则等待窗口可用
 	if s.conf.WindowBlock != 0 {
 		for s.term.window.IsFull() {
+			if s.status == ConnectionClosed { // 防止此协程不能退出
+				s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
+				return true
+			}
 			if s.conf.WindowBlock > 0 {
 				time.Sleep(s.conf.WindowBlock)
 			} else {
@@ -361,9 +368,11 @@ func (s *Session) write(request *Request) bool {
 		}
 	}
 
+	// 执行回调
 	request.SubmitAt = time.Now().Unix()
 	s.onRequest(request)
 
+	// 可以响应的 pdu 需要添加到窗口中
 	if request.Pdu.CanResponse() {
 		err := s.term.window.Put(request)
 		if err != nil {
@@ -373,6 +382,7 @@ func (s *Session) write(request *Request) bool {
 		}
 	}
 
+	// 发送 pdu
 	n, err := s.conn.Write(request.Pdu)
 	if err != nil {
 		LogWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
