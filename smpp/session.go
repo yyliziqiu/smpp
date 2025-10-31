@@ -529,8 +529,8 @@ func (s *Session) Close() {
 }
 
 func (s *Session) Closed() bool {
-	c1 := atomic.LoadInt32(&s.closed) == 1                                           // 显示关闭会话
-	c2 := s.conf.AttemptDial == 0 && atomic.LoadInt32(&s.status) == ConnectionClosed // 或连接已关闭并且没有开启重连
+	c1 := atomic.LoadInt32(&s.closed) == 1                // 显示关闭会话
+	c2 := s.conf.AttemptDial == 0 && s.connectionClosed() // 或连接已关闭并且没有开启重连
 	return c1 || c2
 }
 
@@ -538,7 +538,7 @@ func (s *Session) Status() string {
 	if s.Closed() {
 		return SessionClosed
 	}
-	if atomic.LoadInt32(&s.status) == ConnectionClosed {
+	if s.connectionClosed() {
 		return SessionDialing
 	}
 	return SessionActive
