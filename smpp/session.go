@@ -342,7 +342,7 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	// 若链接已关闭，则尽快结束此协程
-	if s.connectionClosed() {
+	if s.connClosed() {
 		s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 		return true
 	}
@@ -356,7 +356,7 @@ func (s *Session) write(request *Request) bool {
 	// 若窗口已满，则等待窗口可用
 	if s.conf.WindowBlock != 0 {
 		for s.term.window.IsFull() {
-			if s.connectionClosed() { // 防止此协程不能退出
+			if s.connClosed() { // 防止此协程不能退出
 				s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 				return true
 			}
@@ -401,7 +401,7 @@ func (s *Session) write(request *Request) bool {
 	return false
 }
 
-func (s *Session) connectionClosed() bool {
+func (s *Session) connClosed() bool {
 	return s.status == ConnectionClosed
 }
 
@@ -427,13 +427,13 @@ func (s *Session) loopClear() {
 				LogDebug("[Session@%s:%s] Loop window exit", s.id, s.SystemId())
 				return
 			case <-t.C:
-				if s.connectionClosed() {
+				if s.connClosed() {
 					break
 				}
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
-					if s.connectionClosed() {
+					if s.connClosed() {
 						break
 					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
@@ -529,8 +529,8 @@ func (s *Session) Close() {
 }
 
 func (s *Session) Closed() bool {
-	c1 := atomic.LoadInt32(&s.closed) == 1                // 显示关闭会话
-	c2 := s.conf.AttemptDial == 0 && s.connectionClosed() // 或连接已关闭并且没有开启重连
+	c1 := atomic.LoadInt32(&s.closed) == 1          // 显示关闭会话
+	c2 := s.conf.AttemptDial == 0 && s.connClosed() // 或连接已关闭并且没有开启重连
 	return c1 || c2
 }
 
@@ -538,7 +538,7 @@ func (s *Session) Status() string {
 	if s.Closed() {
 		return SessionClosed
 	}
-	if s.connectionClosed() {
+	if s.connClosed() {
 		return SessionDialing
 	}
 	return SessionActive
