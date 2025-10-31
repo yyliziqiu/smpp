@@ -263,7 +263,7 @@ func (s *Session) close(reason string, desc string) {
 	}()
 }
 
-func (s *Session) allowRead(p pdu.PDU) bool {
+func (s *Session) allowRead(_ pdu.PDU) bool {
 	// todo 根据 session 角色和绑定类型限制可以接收哪些类型的 pdu
 	return true
 }
@@ -342,7 +342,7 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	// 若链接已关闭，则尽快结束此协程
-	if s.status == ConnectionClosed {
+	if s.connectionClosed() {
 		s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 		return true
 	}
@@ -356,7 +356,7 @@ func (s *Session) write(request *Request) bool {
 	// 若窗口已满，则等待窗口可用
 	if s.conf.WindowBlock != 0 {
 		for s.term.window.IsFull() {
-			if s.status == ConnectionClosed { // 防止此协程不能退出
+			if s.connectionClosed() { // 防止此协程不能退出
 				s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 				return true
 			}
@@ -401,6 +401,10 @@ func (s *Session) write(request *Request) bool {
 	return false
 }
 
+func (s *Session) connectionClosed() bool {
+	return s.status == ConnectionClosed
+}
+
 func (s *Session) allowWrite(p pdu.PDU) bool {
 	switch p.(type) {
 	case *pdu.BindRequest, *pdu.Unbind, *pdu.Outbind, *pdu.GenericNack, *pdu.AlertNotification:
@@ -423,13 +427,13 @@ func (s *Session) loopClear() {
 				LogDebug("[Session@%s:%s] Loop window exit", s.id, s.SystemId())
 				return
 			case <-t.C:
-				if s.status == ConnectionClosed {
+				if s.connectionClosed() {
 					break
 				}
 				timer := stime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
-					if s.status == ConnectionClosed {
+					if s.connectionClosed() {
 						break
 					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
