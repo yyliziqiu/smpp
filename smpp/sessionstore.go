@@ -3,8 +3,6 @@ package smpp
 import (
 	"maps"
 	"sync"
-
-	"github.com/yyliziqiu/smpp/util"
 )
 
 type SessionStore struct {
@@ -47,7 +45,7 @@ func (t *SessionStore) AddSession(sess *Session) {
 	t.ts[sess.Id()] = sess
 	t.mu.Unlock()
 
-	util.LogDebug("[SessionStore] Add session, id: %s, system id: %s", sess.Id(), sess.SystemId())
+	LogDebug("[SessionStore] Add session, id: %s, system id: %s", sess.Id(), sess.SystemId())
 }
 
 func (t *SessionStore) DelSession(id string) {
@@ -61,5 +59,5 @@ func (t *SessionStore) DelSession(id string) {
 		systemId = sess.SystemId()
 	}
 
-	util.LogDebug("[SessionStore] Del session, id: %s, system id: %s", id, systemId)
+	LogDebug("[SessionStore] Del session, id: %s, system id: %s", id, systemId)
 }

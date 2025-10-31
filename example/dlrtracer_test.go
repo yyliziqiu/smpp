@@ -1,4 +1,4 @@
-package ex
+package example
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/yyliziqiu/slib/stime"
 	"github.com/yyliziqiu/slib/suid"
 
-	"github.com/yyliziqiu/smpp/util"
+	"github.com/yyliziqiu/smpp/smpp"
 )
 
 func TestMain(m *testing.M) {
@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 
 func prepare() {
 	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
-	util.SetLogger(slog.New3("assist"))
+	smpp.SetLogger(slog.New3("assist"))
 }
 
 func finally(code int) {
@@ -49,7 +49,7 @@ func TestDlrTracer(t *testing.T) {
 		})
 	}
 
-	util.PrintMemory("put", true)
+	smpp.PrintMemory("put", true)
 
 	ti := 0
 	for k := range w.data {
@@ -59,7 +59,7 @@ func TestDlrTracer(t *testing.T) {
 		}
 	}
 
-	util.PrintMemory("take", true)
+	smpp.PrintMemory("take", true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -81,13 +81,13 @@ func TestDlrTracer(t *testing.T) {
 	}()
 
 	time.Sleep(wait + 3*time.Second)
-	util.PrintMemory("clear timeout", true)
+	smpp.PrintMemory("clear timeout", true)
 
 	cancel()
 	time.Sleep(time.Second)
 	w = nil
 
-	util.PrintMemory("clear all", true)
+	smpp.PrintMemory("clear all", true)
 }
 
 func TestNewDlrTracer2(t *testing.T) {

@@ -9,8 +9,6 @@ import (
 
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/stime"
-
-	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestGlobalWindow(t *testing.T) {
@@ -24,7 +22,7 @@ func TestGlobalWindow(t *testing.T) {
 		}, int64(rand.IntN(15)))
 	}
 
-	util.PrintMemory("put", true)
+	PrintMemory("put", true)
 
 	for i := 0; i < 1000000; i++ {
 		if i%3 == 0 {
@@ -32,7 +30,7 @@ func TestGlobalWindow(t *testing.T) {
 		}
 	}
 
-	util.PrintMemory("take", true)
+	PrintMemory("take", true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -54,11 +52,11 @@ func TestGlobalWindow(t *testing.T) {
 	}()
 
 	time.Sleep(18 * time.Second)
-	util.PrintMemory("clear timeout", true)
+	PrintMemory("clear timeout", true)
 
 	cancel()
 	time.Sleep(time.Second)
 	gw = nil
 
-	util.PrintMemory("clear all", true)
+	PrintMemory("clear all", true)
 }

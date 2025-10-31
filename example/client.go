@@ -1,4 +1,4 @@
-package ex
+package example
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 
 	"github.com/yyliziqiu/smpp/smpp"
-	"github.com/yyliziqiu/smpp/util"
 )
 
 func StartClient() {
@@ -40,7 +39,7 @@ func StartClient() {
 		// WindowWait: 300 * time.Second,
 		// invoked when received the non-responsive pdu
 		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
-			util.PrintPdu("received", sess.SystemId(), p)
+			smpp.PrintPdu("received", sess.SystemId(), p)
 			if p.CanResponse() {
 				return p.GetResponse()
 			}
@@ -52,7 +51,7 @@ func StartClient() {
 		//
 		// the Response.Pdu must be nil if the TResponse.Error is not nil
 		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
-			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
+			smpp.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		// invoked after the session is closed
 		OnClosed: func(sess *smpp.Session, reason string, desc string) {

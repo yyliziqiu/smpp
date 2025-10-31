@@ -11,8 +11,6 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/slog"
 	"github.com/yyliziqiu/slib/suid"
-
-	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestMain(m *testing.M) {
@@ -23,7 +21,7 @@ func TestMain(m *testing.M) {
 
 func prepare() {
 	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
-	util.SetLogger(slog.New3("smpp"))
+	SetLogger(slog.New3("smpp"))
 }
 
 func finally(code int) {
@@ -42,7 +40,7 @@ func TestClientSession(t *testing.T) {
 		EnquireLink: 10 * time.Second,
 		AttemptDial: 10 * time.Second,
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
-			util.PrintPdu("received", sess.SystemId(), p)
+			PrintPdu("received", sess.SystemId(), p)
 			if p.CanResponse() {
 				return p.GetResponse()
 			}
@@ -50,7 +48,7 @@ func TestClientSession(t *testing.T) {
 		},
 		OnRespond: func(sess *Session, resp *Response) {
 			// fmt.Println("user custom data: ", values)
-			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
+			PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)
@@ -117,7 +115,7 @@ func accept(conn net.Conn) {
 
 	sc := SessionConfig{
 		OnReceive: func(sess *Session, p pdu.PDU) pdu.PDU {
-			util.PrintPdu("received", sess.SystemId(), p)
+			PrintPdu("received", sess.SystemId(), p)
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
@@ -130,7 +128,7 @@ func accept(conn net.Conn) {
 			return nil
 		},
 		OnRespond: func(sess *Session, resp *Response) {
-			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
+			PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)

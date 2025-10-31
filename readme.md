@@ -17,4 +17,4 @@
 
 ## Example
 
-> [examples](https://github.com/yyliziqiu/smpp/tree/master/ex)
+> [examples](https://github.com/yyliziqiu/smpp/tree/master/example)

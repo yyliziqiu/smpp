@@ -10,8 +10,6 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/stime"
 	"github.com/yyliziqiu/slib/suid"
-
-	"github.com/yyliziqiu/smpp/util"
 )
 
 type Session struct {
@@ -87,7 +85,7 @@ func (s *Session) dial() error {
 
 	err := s.conn.Dial()
 	if err != nil {
-		util.LogWarn("[Session@%s:%s] Dial failed, peer addr: %s, error: %v", s.id, s.SystemId(), s.PeerAddr(), err)
+		LogWarn("[Session@%s:%s] Dial failed, peer addr: %s, error: %v", s.id, s.SystemId(), s.PeerAddr(), err)
 		return err
 	}
 
@@ -109,7 +107,7 @@ func (s *Session) dial() error {
 	s.loopWrite()
 	s.loopClear()
 
-	util.LogInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
+	LogInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
 
 	return nil
 }
@@ -133,11 +131,11 @@ func (s *Session) loopRead() {
 		for {
 			select {
 			case <-s.term.ctx.Done():
-				util.LogDebug("[Session@%s:%s] Loop read exit", s.id, s.SystemId())
+				LogDebug("[Session@%s:%s] Loop read exit", s.id, s.SystemId())
 				return
 			default:
 				if s.read() {
-					util.LogDebug("[Session@%s:%s] Loop read stop", s.id, s.SystemId())
+					LogDebug("[Session@%s:%s] Loop read stop", s.id, s.SystemId())
 					return
 				}
 			}
@@ -148,7 +146,7 @@ func (s *Session) loopRead() {
 func (s *Session) read() bool {
 	p, err := s.conn.Read()
 	if err != nil {
-		util.LogWarn("[Session@%s:%s] Read failed, error: %v", s.id, s.SystemId(), err)
+		LogWarn("[Session@%s:%s] Read failed, error: %v", s.id, s.SystemId(), err)
 		s.close(CloseByError, err.Error())
 		return true
 	}
@@ -159,19 +157,19 @@ func (s *Session) read() bool {
 
 	switch p.(type) {
 	case *pdu.EnquireLink:
-		util.LogDebug("[Session@%s:%s] Received enquire link pdu", s.id, s.SystemId())
+		LogDebug("[Session@%s:%s] Received enquire link pdu", s.id, s.SystemId())
 		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
 		return false
 	case *pdu.EnquireLinkResp:
 		s.term.window.Take(p.GetSequenceNumber())
 		return false
 	case *pdu.Unbind:
-		util.LogInfo("[Session@%s:%s] Received unbind pdu", s.id, s.SystemId())
+		LogInfo("[Session@%s:%s] Received unbind pdu", s.id, s.SystemId())
 		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
 		s.close(CloseByPdu, "received unbind pdu")
 		return true
 	case *pdu.UnbindResp:
-		util.LogInfo("[Session@%s:%s] Received unbind resp pdu", s.id, s.SystemId())
+		LogInfo("[Session@%s:%s] Received unbind resp pdu", s.id, s.SystemId())
 		s.close(CloseByPdu, "received unbind response pdu")
 		return true
 	case *pdu.BindRequest:
@@ -180,7 +178,7 @@ func (s *Session) read() bool {
 		s.onReceive(p)
 		return false
 	case *pdu.GenericNack, *pdu.Outbind:
-		util.LogInfo("[Session@%s:%s] Received generic nack or out bind pdu", s.id, s.SystemId())
+		LogInfo("[Session@%s:%s] Received generic nack or out bind pdu", s.id, s.SystemId())
 		s.close(CloseByPdu, "received unexpected pdu")
 		return true
 	}
@@ -207,7 +205,7 @@ func (s *Session) close(reason string, desc string) {
 	}
 
 	go func() {
-		util.LogInfo("[Session@%s:%s] Closing, reason: %s, desc: %s", s.id, s.SystemId(), reason, desc)
+		LogInfo("[Session@%s:%s] Closing, reason: %s, desc: %s", s.id, s.SystemId(), reason, desc)
 
 		// 让正在阻塞中的读写操作超时退出
 		_ = s.conn.SetDeadline(time.Now().Add(300 * time.Millisecond))
@@ -228,7 +226,7 @@ func (s *Session) close(reason string, desc string) {
 		}
 		s.term.window = nil
 
-		util.LogInfo("[Session@%s:%s] Closed", s.id, s.SystemId())
+		LogInfo("[Session@%s:%s] Closed", s.id, s.SystemId())
 
 		// 结束会话
 		closed := s.conf.AttemptDial == 0 || reason == CloseByExplicit
@@ -237,7 +235,7 @@ func (s *Session) close(reason string, desc string) {
 			return
 		}
 
-		util.LogInfo("[Session@%s:%s] Redialing", s.id, s.SystemId())
+		LogInfo("[Session@%s:%s] Redialing", s.id, s.SystemId())
 
 		// 重新启动会话
 		ticker := time.NewTicker(s.conf.AttemptDial)
@@ -245,14 +243,14 @@ func (s *Session) close(reason string, desc string) {
 		for {
 			<-ticker.C
 			if atomic.LoadInt32(&s.closed) == 1 {
-				util.LogInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
+				LogInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
 				s.onClosed(CloseByExplicit, "")
 				return
 			}
 			err := s.dial()
 			if err == nil {
 				if atomic.LoadInt32(&s.closed) == 1 {
-					util.LogInfo("[Session@%s:%s] Close when redialed", s.id, s.SystemId())
+					LogInfo("[Session@%s:%s] Close when redialed", s.id, s.SystemId())
 					s.close(CloseByExplicit, "")
 				}
 				return
@@ -327,11 +325,11 @@ func (s *Session) loopWrite() {
 }
 
 func (s *Session) logLoopWriteExit() {
-	util.LogDebug("[Session@%s:%s] Loop write exit", s.id, s.SystemId())
+	LogDebug("[Session@%s:%s] Loop write exit", s.id, s.SystemId())
 }
 
 func (s *Session) logLoopWriteStop() {
-	util.LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
+	LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
 }
 
 func (s *Session) write(request *Request) bool {
@@ -355,7 +353,7 @@ func (s *Session) write(request *Request) bool {
 	if request.Pdu.CanResponse() {
 		err := s.term.window.Put(request)
 		if err != nil {
-			util.LogWarn("[Session@%s:%s] Put request to window failed, error: %v", s.id, s.SystemId(), err)
+			LogWarn("[Session@%s:%s] Put request to window failed, error: %v", s.id, s.SystemId(), err)
 			s.onRespond(NewResponse(request, nil, err))
 			return false
 		}
@@ -363,7 +361,7 @@ func (s *Session) write(request *Request) bool {
 
 	n, err := s.conn.Write(request.Pdu)
 	if err != nil {
-		util.LogWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
+		LogWarn("[Session@%s:%s] Write failed, error: %v", s.id, s.SystemId(), err)
 		s.onRespond(NewResponse(request, nil, err))
 		if n > 0 {
 			s.close(CloseByError, err.Error())
@@ -398,7 +396,7 @@ func (s *Session) loopClear() {
 		for {
 			select {
 			case <-s.term.ctx.Done():
-				util.LogDebug("[Session@%s:%s] Loop window exit", s.id, s.SystemId())
+				LogDebug("[Session@%s:%s] Loop window exit", s.id, s.SystemId())
 				return
 			case <-t.C:
 				if s.status == ConnectionClosed {
@@ -412,7 +410,7 @@ func (s *Session) loopClear() {
 					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 				}
-				util.LogDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
+				LogDebug("[Session@%s:%s] Handled timeout requests, count: %d, cost: %s", s.id, s.SystemId(), len(requests), timer.Stops())
 			}
 		}
 	}()

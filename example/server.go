@@ -1,4 +1,4 @@
-package ex
+package example
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"github.com/yyliziqiu/slib/suid"
 
 	"github.com/yyliziqiu/smpp/smpp"
-	"github.com/yyliziqiu/smpp/util"
 )
 
 func StartServer() {
@@ -46,7 +45,7 @@ func accept(conn net.Conn) {
 	// set session config
 	conf := smpp.SessionConfig{
 		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
-			util.PrintPdu("received", sess.SystemId(), p)
+			smpp.PrintPdu("received", sess.SystemId(), p)
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
@@ -59,7 +58,7 @@ func accept(conn net.Conn) {
 			return nil
 		},
 		OnRespond: func(sess *smpp.Session, resp *smpp.Response) {
-			util.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
+			smpp.PrintPdu("response", resp.Request.SystemId, resp.Pdu)
 		},
 		OnClosed: func(sess *smpp.Session, reason string, desc string) {
 			fmt.Printf("[Closed] system id: %s, reason: %s, desc: %s\n", sess.SystemId(), reason, desc)

@@ -9,8 +9,6 @@ import (
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/yyliziqiu/slib/scq2"
 	"github.com/yyliziqiu/slib/stime"
-
-	"github.com/yyliziqiu/smpp/util"
 )
 
 func TestQueueWindow(t *testing.T) {
@@ -80,7 +78,7 @@ func TestQueueWindow2(t *testing.T) {
 		}
 	}
 
-	util.PrintMemory("put", true)
+	PrintMemory("put", true)
 
 	for k := range w.data {
 		if k%2 == 0 {
@@ -88,7 +86,7 @@ func TestQueueWindow2(t *testing.T) {
 		}
 	}
 
-	util.PrintMemory("take", true)
+	PrintMemory("take", true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -110,11 +108,11 @@ func TestQueueWindow2(t *testing.T) {
 	}()
 
 	time.Sleep(wait + 3*time.Second)
-	util.PrintMemory("clear timeout", true)
+	PrintMemory("clear timeout", true)
 
 	cancel()
 	time.Sleep(time.Second)
 	w = nil
 
-	util.PrintMemory("clear all", true)
+	PrintMemory("clear all", true)
 }
