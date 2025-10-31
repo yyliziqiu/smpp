@@ -8,6 +8,7 @@ import (
 )
 
 type Window interface {
+	IsFull() bool
 	Put(*Request) error
 	Take(int32) *Request
 	TakeTimeout() []*Request
@@ -28,6 +29,14 @@ func NewMapWindow(size int, wait time.Duration) Window {
 		wait: int64(wait.Seconds()),
 		data: make(map[int32]*Request, size),
 	}
+}
+
+func (w *MapWindow) IsFull() bool {
+	w.mu.Lock()
+	full := len(w.data) >= w.size
+	w.mu.Unlock()
+
+	return full
 }
 
 func (w *MapWindow) Put(request *Request) error {
@@ -96,6 +105,14 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 		data:  make(map[int32]*QueueWindowValue, size),
 		queue: scq2.New(size * 2),
 	}
+}
+
+func (w *QueueWindow) IsFull() bool {
+	w.mu.Lock()
+	full := len(w.data) >= w.size
+	w.mu.Unlock()
+
+	return full
 }
 
 func (w *QueueWindow) Put(request *Request) error {

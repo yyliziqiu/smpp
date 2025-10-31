@@ -3,6 +3,7 @@ package smpp
 import (
 	"context"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,6 +41,7 @@ type SessionConfig struct {
 	WindowSize  int                             // 窗口大小
 	WindowWait  time.Duration                   // 超时时间
 	WindowScan  time.Duration                   // 清理窗口内超时请求的时间间隔
+	WindowBlock time.Duration                   //
 	NewWindow   func(*Session) Window           // 根据用户创建窗口
 	OnReceive   func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
 	OnRequest   func(*Session, *Request)        // 向对端提交 pdu 时执行
@@ -345,6 +347,18 @@ func (s *Session) write(request *Request) bool {
 	if !s.allowWrite(request.Pdu) {
 		s.onRespond(NewResponse(request, nil, ErrNotAllowed))
 		return false
+	}
+
+	if s.conf.WindowBlock != 0 {
+		if s.conf.WindowBlock > 0 {
+			for s.term.window.IsFull() {
+				time.Sleep(s.conf.WindowBlock)
+			}
+		} else {
+			for s.term.window.IsFull() {
+				runtime.Gosched()
+			}
+		}
 	}
 
 	request.SubmitAt = time.Now().Unix()
