@@ -21,7 +21,7 @@ type Session struct {
 	term   *SessionTerm   //
 	status int32          // 连接状态
 	closed int32          // 会话是否被显示关闭
-	initAt time.Time      //
+	initAt time.Time      // 会话创建时间
 }
 
 type SessionTerm struct {
@@ -41,7 +41,7 @@ type SessionConfig struct {
 	WindowSize  int                             // 窗口大小
 	WindowWait  time.Duration                   // 超时时间
 	WindowScan  time.Duration                   // 清理窗口内超时请求的时间间隔
-	WindowBlock time.Duration                   //
+	WindowBlock time.Duration                   // 当窗口满时写操作的阻塞时间，0表示不阻塞返回错误，大于0表示阻塞时间，小于0表示挂起当前协程等待下次调度
 	NewWindow   func(*Session) Window           // 根据用户创建窗口
 	OnReceive   func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
 	OnRequest   func(*Session, *Request)        // 向对端提交 pdu 时执行
@@ -61,6 +61,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		conf.WindowScan = time.Minute
 	}
 
+	// 创建 session
 	s := &Session{
 		id:     suid.Get(),
 		store:  _store,
@@ -72,6 +73,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		initAt: time.Now(),
 	}
 
+	// 连接
 	err := s.dial()
 	if err != nil {
 		return nil, err
@@ -350,12 +352,10 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	if s.conf.WindowBlock != 0 {
-		if s.conf.WindowBlock > 0 {
-			for s.term.window.IsFull() {
+		for s.term.window.IsFull() {
+			if s.conf.WindowBlock > 0 {
 				time.Sleep(s.conf.WindowBlock)
-			}
-		} else {
-			for s.term.window.IsFull() {
+			} else {
 				runtime.Gosched()
 			}
 		}
