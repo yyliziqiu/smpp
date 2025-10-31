@@ -114,9 +114,7 @@ func (w *QueueWindow) put(request *Request) error {
 	value := &QueueWindowValue{
 		Request: request,
 	}
-
 	w.data[request.Pdu.GetSequenceNumber()] = value
-
 	w.queue.Push(value)
 
 	return nil
@@ -137,9 +135,7 @@ func (w *QueueWindow) take(sequence int32) *Request {
 	}
 
 	delete(w.data, sequence)
-
 	request := value.Request
-
 	value.Request = nil
 
 	return request

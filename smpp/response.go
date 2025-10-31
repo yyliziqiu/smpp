@@ -12,9 +12,9 @@ type Response struct {
 	Error   error
 }
 
-func NewResponse(request *Request, p pdu.PDU, err error) *Response {
+func NewResponse(req *Request, p pdu.PDU, err error) *Response {
 	return &Response{
-		Request: request,
+		Request: req,
 		Pdu:     p,
 		Error:   err,
 	}
@@ -22,16 +22,6 @@ func NewResponse(request *Request, p pdu.PDU, err error) *Response {
 
 func (resp *Response) TraceData() any {
 	return resp.Request.TraceData
-}
-
-func (resp *Response) TraceDataInt() (int, bool) {
-	data, ok := resp.Request.TraceData.(int)
-	return data, ok
-}
-
-func (resp *Response) TraceDataString() (string, bool) {
-	data, ok := resp.Request.TraceData.(string)
-	return data, ok
 }
 
 func (resp *Response) SessionId() string {
@@ -46,9 +36,23 @@ func (resp *Response) SubmitAt() int64 {
 	return resp.Request.SubmitAt
 }
 
-func (resp *Response) Errors() string {
+func (resp *Response) ErrorString() string {
 	if resp.Error == nil {
 		return ""
 	}
 	return resp.Error.Error()
+}
+
+func (resp *Response) TraceInt() int {
+	if i, ok := resp.Request.TraceData.(int); ok {
+		return i
+	}
+	return 0
+}
+
+func (resp *Response) TraceString() string {
+	if s, ok := resp.Request.TraceData.(string); ok {
+		return s
+	}
+	return ""
 }
