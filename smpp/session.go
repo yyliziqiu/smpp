@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/stime"
-	"github.com/yyliziqiu/slib/suid"
+	"github.com/yyliziqiu/gdk/xtime"
+	"github.com/yyliziqiu/gdk/xuid"
 )
 
 type Session struct {
@@ -63,7 +63,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 
 	// 创建 session
 	s := &Session{
-		id:     suid.Get(),
+		id:     xuid.Get(),
 		store:  _store,
 		conn:   conn,
 		conf:   &conf,
@@ -430,7 +430,7 @@ func (s *Session) loopClear() {
 				if s.connClosed() {
 					break
 				}
-				timer := stime.NewTimer()
+				timer := xtime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
 					if s.connClosed() {

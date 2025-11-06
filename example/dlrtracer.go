@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/yyliziqiu/slib/suid"
+	"github.com/yyliziqiu/gdk/xuid"
 )
 
 func StartDlrTracer() {
@@ -17,7 +17,7 @@ func StartDlrTracer() {
 
 	// put the message id to tracer for dlr trace
 	t.Put(&DlrNode{
-		MessageId: suid.Get(),
+		MessageId: xuid.Get(),
 		SystemId:  "user1",
 		ExpireAt:  time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 	})

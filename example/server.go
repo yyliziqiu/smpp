@@ -8,7 +8,7 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/suid"
+	"github.com/yyliziqiu/gdk/xuid"
 
 	"github.com/yyliziqiu/smpp/smpp"
 )
@@ -49,7 +49,7 @@ func accept(conn net.Conn) {
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
-				p2.MessageID = suid.Get()
+				p2.MessageID = xuid.Get()
 				return p2
 			}
 			if p.CanResponse() {
@@ -81,7 +81,7 @@ func accept(conn net.Conn) {
 
 func deliverSmPdu() *pdu.DeliverSM {
 	dlr := smpp.Dlr{
-		Id:    suid.Get(),
+		Id:    xuid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
 		Sd:    time.Now(),

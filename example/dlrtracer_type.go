@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yyliziqiu/slib/ssnap"
+	"github.com/yyliziqiu/gdk/xsnap"
 )
 
 type DlrTracer struct {
 	data map[string]*DlrNode
 	heap DlrHeap
-	snap *ssnap.Snap
+	snap *xsnap.Snap
 	mu   sync.Mutex
 }
 
@@ -26,7 +26,7 @@ func NewDlrTracer2(size int, path string) *DlrTracer {
 		heap: make(DlrHeap, 0, size),
 	}
 	if path != "" {
-		t.snap = ssnap.New(filepath.Join(path, "DlrTracer.data"), &t.data)
+		t.snap = xsnap.New(filepath.Join(path, "DlrTracer.data"), &t.data)
 	}
 	return t
 }

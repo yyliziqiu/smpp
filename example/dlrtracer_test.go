@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yyliziqiu/slib/slog"
-	"github.com/yyliziqiu/slib/stime"
-	"github.com/yyliziqiu/slib/suid"
+	"github.com/yyliziqiu/gdk/xlog"
+	"github.com/yyliziqiu/gdk/xtime"
+	"github.com/yyliziqiu/gdk/xuid"
 
 	"github.com/yyliziqiu/smpp/smpp"
 )
@@ -23,8 +23,8 @@ func TestMain(m *testing.M) {
 }
 
 func prepare() {
-	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
-	smpp.SetLogger(slog.New3("assist"))
+	_ = xlog.Init(xlog.Config{Path: "/private/ws/self/smpp"})
+	smpp.SetLogger(xlog.New3("assist"))
 }
 
 func finally(code int) {
@@ -43,7 +43,7 @@ func TestDlrTracer(t *testing.T) {
 
 	for i := 0; i < put; i++ {
 		w.Put(&DlrNode{
-			MessageId: suid.Get(),
+			MessageId: xuid.Get(),
 			SystemId:  "user1",
 			ExpireAt:  time.Now().Unix() + int64(rand.IntN(int(wait.Seconds()))),
 		})
@@ -71,7 +71,7 @@ func TestDlrTracer(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				timer := stime.NewTimer()
+				timer := xtime.NewTimer()
 				tos := w.TakeTimeout() // 遍历1000000耗时150ms
 				if len(tos) > 0 {
 					fmt.Printf("[stat] take: %d, cost: %s, map: %d, heap: %d\n", len(tos), timer.Stops(), len(w.data), w.heap.Len())
@@ -95,7 +95,7 @@ func TestNewDlrTracer2(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		w.Put(&DlrNode{
-			MessageId: suid.Get(),
+			MessageId: xuid.Get(),
 			SystemId:  "user1",
 			ExpireAt:  time.Now().Unix() + int64(i),
 		})

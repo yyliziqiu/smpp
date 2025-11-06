@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yyliziqiu/slib/scq2"
+	"github.com/yyliziqiu/gdk/xcq"
 )
 
 type Window interface {
@@ -90,7 +90,7 @@ type QueueWindow struct {
 	size  int
 	wait  int64
 	data  map[int32]*QueueWindowValue
-	queue *scq2.Queue
+	queue *xcq.Queue
 	mu    sync.Mutex
 }
 
@@ -103,7 +103,7 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 		size:  size,
 		wait:  int64(wait.Seconds()),
 		data:  make(map[int32]*QueueWindowValue, size),
-		queue: scq2.New(size * 2),
+		queue: xcq.New(size * 2),
 	}
 }
 

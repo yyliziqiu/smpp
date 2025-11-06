@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/scq2"
-	"github.com/yyliziqiu/slib/stime"
+	"github.com/yyliziqiu/gdk/xcq"
+	"github.com/yyliziqiu/gdk/xtime"
 )
 
 func TestQueueWindow(t *testing.T) {
@@ -20,7 +20,7 @@ func TestQueueWindow(t *testing.T) {
 		size:  size,
 		wait:  int64(wait.Seconds()),
 		data:  make(map[int32]*QueueWindowValue, size),
-		queue: scq2.New(size * 2),
+		queue: xcq.New(size * 2),
 	}
 
 	for i := 0; i < put; i++ {
@@ -64,7 +64,7 @@ func TestQueueWindow2(t *testing.T) {
 		size:  size,
 		wait:  int64(wait.Seconds()),
 		data:  make(map[int32]*QueueWindowValue, size),
-		queue: scq2.New(size * 2),
+		queue: xcq.New(size * 2),
 	}
 
 	for i := 0; i < put; i++ {
@@ -98,7 +98,7 @@ func TestQueueWindow2(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				timer := stime.NewTimer()
+				timer := xtime.NewTimer()
 				requests := w.TakeTimeout() // 遍历1000000耗时65ms
 				if len(requests) > 0 {
 					fmt.Printf("[stat] take: %d, cost: %s, map: %d, queue: %s\n", len(requests), timer.Stops(), len(w.data), w.queue.Status())

@@ -9,8 +9,8 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/slog"
-	"github.com/yyliziqiu/slib/suid"
+	"github.com/yyliziqiu/gdk/xlog"
+	"github.com/yyliziqiu/gdk/xuid"
 )
 
 func TestMain(m *testing.M) {
@@ -20,8 +20,8 @@ func TestMain(m *testing.M) {
 }
 
 func prepare() {
-	_ = slog.Init(slog.Config{Path: "/private/ws/self/smpp"})
-	SetLogger(slog.New3("smpp"))
+	_ = xlog.Init(xlog.Config{Path: "/private/ws/self/smpp"})
+	SetLogger(xlog.New3("smpp"))
 }
 
 func finally(code int) {
@@ -119,7 +119,7 @@ func accept(conn net.Conn) {
 			switch p.(type) {
 			case *pdu.SubmitSM:
 				p2 := p.GetResponse().(*pdu.SubmitSMResp)
-				p2.MessageID = suid.Get()
+				p2.MessageID = xuid.Get()
 				return p2
 			}
 			if p.CanResponse() {
@@ -153,7 +153,7 @@ func accept(conn net.Conn) {
 
 func deliverSmPdu() *pdu.DeliverSM {
 	dlr := Dlr{
-		Id:    suid.Get(),
+		Id:    xuid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
 		Sd:    time.Now(),

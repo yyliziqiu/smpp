@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/slib/stime"
+	"github.com/yyliziqiu/gdk/xtime"
 )
 
 func TestGlobalWindow(t *testing.T) {
@@ -42,7 +42,7 @@ func TestGlobalWindow(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				timer := stime.NewTimer()
+				timer := xtime.NewTimer()
 				requests := gw.TakeTimeout() // 遍历1000000耗时65ms
 				if len(requests) > 0 {
 					fmt.Printf("[stat] take: %d, cost: %s, map: %d, heap: %d\n", len(requests), timer.Stops(), len(gw.data), len(gw.heap))
