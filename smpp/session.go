@@ -83,7 +83,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 }
 
 func (s *Session) dial() error {
-	if atomic.LoadInt32(&s.status) == ConnectionDialed {
+	if s.connDialed() {
 		return nil
 	}
 
@@ -114,6 +114,14 @@ func (s *Session) dial() error {
 	LogInfo("[Session@%s:%s] Dial succeed, peer addr: %s", s.id, s.SystemId(), s.PeerAddr())
 
 	return nil
+}
+
+func (s *Session) connDialed() bool {
+	return atomic.LoadInt32(&s.status) == ConnectionDialed
+}
+
+func (s *Session) connClosed() bool {
+	return atomic.LoadInt32(&s.status) == ConnectionClosed
 }
 
 func (s *Session) newWindow() Window {
@@ -401,10 +409,6 @@ func (s *Session) write(request *Request) bool {
 	return false
 }
 
-func (s *Session) connClosed() bool {
-	return s.status == ConnectionClosed
-}
-
 func (s *Session) allowWrite(p pdu.PDU) bool {
 	switch p.(type) {
 	case *pdu.BindRequest, *pdu.Unbind, *pdu.Outbind, *pdu.GenericNack, *pdu.AlertNotification:
@@ -514,7 +518,7 @@ func (s *Session) SetContext(ctx any) {
 }
 
 func (s *Session) Write(p pdu.PDU, data any) error {
-	if atomic.LoadInt32(&s.status) == ConnectionClosed {
+	if s.connClosed() {
 		return ErrConnectionClosed
 	}
 
@@ -526,6 +530,10 @@ func (s *Session) Write(p pdu.PDU, data any) error {
 func (s *Session) Close() {
 	atomic.StoreInt32(&s.closed, 1)
 	s.close(CloseByExplicit, "")
+}
+
+func (s *Session) IsActive() bool {
+	return s.connDialed()
 }
 
 func (s *Session) Closed() bool {
