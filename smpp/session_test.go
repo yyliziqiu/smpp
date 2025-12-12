@@ -31,8 +31,8 @@ func finally(code int) {
 func TestClientSession(t *testing.T) {
 	cc := ClientConnectionConfig{
 		Smsc:     "127.0.0.1:10032",
-		SystemId: "test_user",
-		Password: "test_user",
+		SystemId: "httpproxy_test",
+		Password: "D4A222A0",
 		BindType: pdu.Transceiver,
 	}
 
