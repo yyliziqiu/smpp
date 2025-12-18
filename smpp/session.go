@@ -517,6 +517,10 @@ func (s *Session) SetContext(ctx any) {
 	s.conf.Context = ctx
 }
 
+func (s *Session) GetWindow() Window {
+	return s.term.window
+}
+
 func (s *Session) Write(p pdu.PDU, data any) error {
 	if s.connClosed() {
 		return ErrConnectionClosed

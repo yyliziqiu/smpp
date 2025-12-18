@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yyliziqiu/gdk/xcq"
+	"golang.org/x/exp/maps"
 )
 
 type Window interface {
@@ -29,6 +30,13 @@ func NewMapWindow(size int, wait time.Duration) Window {
 		wait: int64(wait.Seconds()),
 		data: make(map[int32]*Request, size),
 	}
+}
+
+func (w *MapWindow) GetData() map[int32]*Request {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return maps.Clone(w.data)
 }
 
 func (w *MapWindow) IsFull() bool {
@@ -105,6 +113,13 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 		data:  make(map[int32]*QueueWindowValue, size),
 		queue: xcq.New(size * 2),
 	}
+}
+
+func (w *QueueWindow) GetData() map[int32]*QueueWindowValue {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return maps.Clone(w.data)
 }
 
 func (w *QueueWindow) IsFull() bool {
