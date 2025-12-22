@@ -12,36 +12,29 @@ import (
 
 var _logger *logrus.Logger
 
-func SetLogger(logger *logrus.Logger) {
-	_logger = logger
-}
-
 func LogDebug(s string, a ...any) {
-	if _logger == nil {
-		return
+	if _logger != nil {
+		_logger.Debugf(s, a...)
 	}
-	_logger.Debugf(s, a...)
 }
 
 func LogInfo(s string, a ...any) {
-	if _logger == nil {
-		return
+	if _logger != nil {
+		_logger.Infof(s, a...)
 	}
-	_logger.Infof(s, a...)
 }
 
 func LogWarn(s string, a ...any) {
-	if _logger == nil {
-		return
+	if _logger != nil {
+		_logger.Warnf(s, a...)
 	}
-	_logger.Warnf(s, a...)
 }
 
-func LogError(s string, a ...any) {
-	if _logger == nil {
-		return
+func PrintPdu(tag string, systemId string, p pdu.PDU) {
+	if p != nil {
+		bs, _ := json.MarshalIndent(p, "", "  ")
+		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
 	}
-	_logger.Errorf(s, a...)
 }
 
 func PrintMemory(tag string, gc bool) {
@@ -54,11 +47,4 @@ func PrintMemory(tag string, gc bool) {
 	runtime.ReadMemStats(&memStats)
 
 	fmt.Printf("[memory:%s] alloc: %d KB\n", tag, memStats.Alloc/1024)
-}
-
-func PrintPdu(tag string, systemId string, p pdu.PDU) {
-	if p != nil {
-		bs, _ := json.MarshalIndent(p, "", "  ")
-		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
-	}
 }

@@ -3,7 +3,14 @@ package smpp
 import (
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
+	"github.com/sirupsen/logrus"
 )
+
+// ============ Logger ============
+
+func SetLogger(logger *logrus.Logger) {
+	_logger = logger
+}
 
 // ============ Session ============
 
@@ -26,7 +33,7 @@ func CountSessions() int {
 // Address
 // TON (Type of Number)
 // 0  Unknown           未知类型（默认）
-// 1  Internationa      国际号码（带国家代码，如 +8613800000000）
+// 1  International     国际号码（带国家代码，如 +8613800000000）
 // 2  National          国内号码（不带国家码，如 13800000000）
 // 3  Network Specific  特定网络号码（内部路由号码）
 // 4  Subscriber Number 用户号码（短号或本地号码）

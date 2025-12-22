@@ -29,20 +29,24 @@ func NewServerConnection(conn net.Conn, conf ServerConnectionConfig) *ServerConn
 	return &ServerConnection{conn: conn, conf: &conf}
 }
 
-func (c *ServerConnection) SystemId() string {
-	return c.systemId
-}
-
-func (c *ServerConnection) BindType() pdu.BindingType {
-	return c.bindType
-}
-
 func (c *ServerConnection) SelfAddr() string {
 	return c.selfAddr
 }
 
 func (c *ServerConnection) PeerAddr() string {
 	return c.peerAddr
+}
+
+func (c *ServerConnection) SetDeadline(t time.Time) error {
+	return c.conn.SetDeadline(t)
+}
+
+func (c *ServerConnection) SystemId() string {
+	return c.systemId
+}
+
+func (c *ServerConnection) BindType() pdu.BindingType {
+	return c.bindType
 }
 
 func (c *ServerConnection) Dial() error {
@@ -54,13 +58,15 @@ func (c *ServerConnection) Dial() error {
 }
 
 func (c *ServerConnection) dial() error {
+	// 关闭旧链接
 	if c.conn == nil {
 		return ErrConnectionIsNil
 	}
 
-	c.selfAddr = c.conn.LocalAddr().String()
-	c.peerAddr = c.conn.RemoteAddr().String()
+	// 获取两端地址
+	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
 
+	// 获取绑定请求
 	var (
 		br *pdu.BindRequest
 		ok bool
@@ -75,23 +81,25 @@ func (c *ServerConnection) dial() error {
 			break
 		}
 	}
-
 	if !ok {
 		return ErrBindFailed
 	}
 
+	// 记录绑定信息
 	c.systemId = br.SystemID
 	c.bindType = br.BindingType
 
+	// 账户认证
 	status := c.conf.Authenticate(c, br.SystemID, br.Password)
 
+	// 返回绑定结果
 	brp := br.GetResponse().(*pdu.BindResp)
 	brp.Header.CommandStatus = status
-	_, err := c.Write(brp)
-	if err != nil {
+	if _, err := c.Write(brp); err != nil {
 		return err
 	}
 
+	// 认证失败返回错误
 	if status != data.ESME_ROK {
 		return ErrAuthFailed
 	}
@@ -100,32 +108,13 @@ func (c *ServerConnection) dial() error {
 }
 
 func (c *ServerConnection) Read() (pdu.PDU, error) {
-	if c.conf.ReadTimeout > 0 {
-		if err := c.conn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout)); err != nil {
-			return nil, err
-		}
-	}
-	return pdu.Parse(c.conn)
+	return ConnRead(c.conn, c.conf.ReadTimeout)
 }
 
-func (c *ServerConnection) Write(p pdu.PDU) (int, error) {
-	buf := pdu.NewBuffer(make([]byte, 0, 64))
-	p.Marshal(buf)
-
-	if c.conf.WriteTimeout > 0 {
-		if err := c.conn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout)); err != nil {
-			return 0, err
-		}
-	}
-
-	return c.conn.Write(buf.Bytes())
+func (c *ServerConnection) Write(pd pdu.PDU) (int, error) {
+	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
-func (c *ServerConnection) Close() error {
-	// _, _ = c.Write(pdu.NewUnbind())
-	return c.conn.Close()
-}
-
-func (c *ServerConnection) SetDeadline(t time.Time) error {
-	return c.conn.SetDeadline(t)
+func (c *ServerConnection) Close(bye bool) error {
+	return ConnClose(c.conn, bye)
 }

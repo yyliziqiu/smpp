@@ -9,8 +9,10 @@ import (
 )
 
 type ClientConnection struct {
-	conf *ClientConnectionConfig
-	conn net.Conn
+	conf     *ClientConnectionConfig
+	conn     net.Conn
+	selfAddr string
+	peerAddr string
 }
 
 type ClientConnectionConfig struct {
@@ -32,6 +34,18 @@ func NewClientConnection(conf ClientConnectionConfig) *ClientConnection {
 	return &ClientConnection{conf: &conf}
 }
 
+func (c *ClientConnection) SelfAddr() string {
+	return c.selfAddr
+}
+
+func (c *ClientConnection) PeerAddr() string {
+	return c.peerAddr
+}
+
+func (c *ClientConnection) SetDeadline(t time.Time) error {
+	return c.conn.SetDeadline(t)
+}
+
 func (c *ClientConnection) SystemId() string {
 	return c.conf.SystemId
 }
@@ -40,32 +54,23 @@ func (c *ClientConnection) BindType() pdu.BindingType {
 	return c.conf.BindType
 }
 
-func (c *ClientConnection) SelfAddr() string {
-	if c.conn == nil {
-		return ""
-	}
-	return c.conn.LocalAddr().String()
-}
-
-func (c *ClientConnection) PeerAddr() string {
-	if c.conn == nil {
-		return c.conf.Smsc
-	}
-	return c.conn.RemoteAddr().String()
-}
-
 func (c *ClientConnection) Dial() error {
+	// 关闭旧链接
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
 
+	// 连接
 	var err error
-
 	c.conn, err = c.conf.Dial(c.conf.Smsc)
 	if err != nil {
 		return err
 	}
 
+	// 获取两端地址
+	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
+
+	// 绑定账号
 	err = c.bind()
 	if err != nil {
 		_ = c.conn.Close()
@@ -121,33 +126,13 @@ func (c *ClientConnection) bind() error {
 }
 
 func (c *ClientConnection) Read() (pdu.PDU, error) {
-	if c.conf.ReadTimeout > 0 {
-		if err := c.conn.SetReadDeadline(time.Now().Add(c.conf.ReadTimeout)); err != nil {
-			return nil, err
-		}
-	}
-	return pdu.Parse(c.conn)
+	return ConnRead(c.conn, c.conf.ReadTimeout)
 }
 
-func (c *ClientConnection) Write(p pdu.PDU) (int, error) {
-	buf := pdu.NewBuffer(make([]byte, 0, 64))
-	p.Marshal(buf)
-
-	if c.conf.WriteTimeout > 0 {
-		if err := c.conn.SetWriteDeadline(time.Now().Add(c.conf.WriteTimeout)); err != nil {
-			return 0, err
-		}
-	}
-
-	return c.conn.Write(buf.Bytes())
+func (c *ClientConnection) Write(pd pdu.PDU) (int, error) {
+	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
-func (c *ClientConnection) Close() error {
-	_, _ = c.Write(pdu.NewUnbind())
-	time.Sleep(100 * time.Millisecond) // 防止对端响应时 reset
-	return c.conn.Close()
-}
-
-func (c *ClientConnection) SetDeadline(t time.Time) error {
-	return c.conn.SetDeadline(t)
+func (c *ClientConnection) Close(bye bool) error {
+	return ConnClose(c.conn, bye)
 }

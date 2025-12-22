@@ -25,7 +25,7 @@ type Session struct {
 }
 
 type SessionTerm struct {
-	wg     sync.WaitGroup
+	swg    sync.WaitGroup
 	ctx    context.Context
 	cancel context.CancelFunc
 	window Window
@@ -42,12 +42,12 @@ type SessionConfig struct {
 	WindowWait  time.Duration                   // 超时时间
 	WindowScan  time.Duration                   // 清理窗口内超时请求的时间间隔
 	WindowBlock time.Duration                   // 当窗口满时写操作的阻塞时间，0表示不阻塞返回错误，大于0表示阻塞时间，小于0表示挂起当前协程等待下次调度
-	NewWindow   func(*Session) Window           // 根据用户创建窗口
+	WindowNewer func(*Session) Window           // 自定义窗口
+	OnDialed    func(*Session)                  // 连接成功时执行
+	OnClosed    func(*Session, string, string)  // 关闭会话时执行
 	OnReceive   func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
 	OnRequest   func(*Session, *Request)        // 向对端提交 pdu 时执行
 	OnRespond   func(*Session, *Response)       // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
-	OnDialed    func(*Session)                  // 连接成功时执行
-	OnClosed    func(*Session, string, string)  // 关闭会话时执行
 }
 
 func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
@@ -94,14 +94,23 @@ func (s *Session) dial() error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var window Window
+	if s.conf.WindowNewer == nil {
+		window = s.conf.WindowNewer(s)
+	} else {
+		window = CreateWindow(s.conf.WindowType, s.conf.WindowSize, s.conf.WindowWait)
+	}
+
 	s.term = &SessionTerm{
+		swg:    sync.WaitGroup{},
 		ctx:    ctx,
 		cancel: cancel,
-		window: s.newWindow(),
+		window: window,
 		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
-	s.term.wg.Add(3)
+	s.term.swg.Add(3)
 
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
@@ -124,22 +133,70 @@ func (s *Session) connClosed() bool {
 	return atomic.LoadInt32(&s.status) == ConnectionClosed
 }
 
-func (s *Session) newWindow() Window {
-	if s.conf.NewWindow != nil {
-		return s.conf.NewWindow(s)
+func (s *Session) close(reason string, desc string) {
+	if !atomic.CompareAndSwapInt32(&s.status, ConnectionDialed, ConnectionClosed) {
+		return
 	}
 
-	switch s.conf.WindowType {
-	case 1:
-		return NewQueueWindow(s.conf.WindowSize, s.conf.WindowWait)
-	default:
-		return NewMapWindow(s.conf.WindowSize, s.conf.WindowWait)
-	}
+	go func() {
+		LogInfo("[Session@%s:%s] Closing, reason: %s, desc: %s", s.id, s.SystemId(), reason, desc)
+
+		// 停止读写协程
+		s.term.cancel()
+		time.Sleep(100 * time.Millisecond)
+
+		// 让正在阻塞中的读写操作超时退出
+		_ = s.conn.SetDeadline(time.Now().Add(200 * time.Millisecond))
+
+		// 等待读写协程停止
+		s.term.swg.Wait()
+
+		// 关闭链接
+		_ = s.conn.Close(reason == CloseByExplicit)
+
+		// 清理会话数据
+		close(s.term.reqCh)
+		for request := range s.term.reqCh {
+			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
+		}
+		s.term.window = nil
+
+		LogInfo("[Session@%s:%s] Closed", s.id, s.SystemId())
+
+		// 结束会话
+		closed := s.conf.AttemptDial == 0 || reason == CloseByExplicit
+		if closed {
+			s.onClosed(reason, desc)
+			return
+		}
+
+		LogInfo("[Session@%s:%s] Redialing", s.id, s.SystemId())
+
+		// 重新启动会话
+		ticker := time.NewTicker(s.conf.AttemptDial)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			if atomic.LoadInt32(&s.closed) == 1 {
+				LogInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
+				s.onClosed(CloseByExplicit, "")
+				return
+			}
+			err := s.dial()
+			if err == nil {
+				if atomic.LoadInt32(&s.closed) == 1 {
+					LogInfo("[Session@%s:%s] Close when redialed", s.id, s.SystemId())
+					s.close(CloseByExplicit, "")
+				}
+				return
+			}
+		}
+	}()
 }
 
 func (s *Session) loopRead() {
 	go func() {
-		defer s.term.wg.Done()
+		defer s.term.swg.Done()
 		for {
 			select {
 			case <-s.term.ctx.Done():
@@ -211,66 +268,6 @@ func (s *Session) read() bool {
 	return false
 }
 
-func (s *Session) close(reason string, desc string) {
-	if !atomic.CompareAndSwapInt32(&s.status, ConnectionDialed, ConnectionClosed) {
-		return
-	}
-
-	go func() {
-		LogInfo("[Session@%s:%s] Closing, reason: %s, desc: %s", s.id, s.SystemId(), reason, desc)
-
-		// 让正在阻塞中的读写操作超时退出
-		_ = s.conn.SetDeadline(time.Now().Add(300 * time.Millisecond))
-
-		// 停止读写协程
-		s.term.cancel()
-
-		// 等待读写协程停止
-		s.term.wg.Wait()
-
-		// 关闭链接
-		_ = s.conn.Close()
-
-		// 清理会话数据
-		close(s.term.reqCh)
-		for request := range s.term.reqCh {
-			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
-		}
-		s.term.window = nil
-
-		LogInfo("[Session@%s:%s] Closed", s.id, s.SystemId())
-
-		// 结束会话
-		closed := s.conf.AttemptDial == 0 || reason == CloseByExplicit
-		if closed {
-			s.onClosed(reason, desc)
-			return
-		}
-
-		LogInfo("[Session@%s:%s] Redialing", s.id, s.SystemId())
-
-		// 重新启动会话
-		ticker := time.NewTicker(s.conf.AttemptDial)
-		defer ticker.Stop()
-		for {
-			<-ticker.C
-			if atomic.LoadInt32(&s.closed) == 1 {
-				LogInfo("[Session@%s:%s] Close when redialing", s.id, s.SystemId())
-				s.onClosed(CloseByExplicit, "")
-				return
-			}
-			err := s.dial()
-			if err == nil {
-				if atomic.LoadInt32(&s.closed) == 1 {
-					LogInfo("[Session@%s:%s] Close when redialed", s.id, s.SystemId())
-					s.close(CloseByExplicit, "")
-				}
-				return
-			}
-		}
-	}()
-}
-
 func (s *Session) allowRead(_ pdu.PDU) bool {
 	// todo 根据 session 角色和绑定类型限制可以接收哪些类型的 pdu
 	return true
@@ -294,15 +291,15 @@ func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
 func (s *Session) loopWrite() {
 	if s.conf.EnquireLink == 0 {
 		go func() {
-			defer s.term.wg.Done()
+			defer s.term.swg.Done()
 			for {
 				select {
 				case <-s.term.ctx.Done():
-					s.logLoopWriteExit()
+					LogDebug("[Session@%s:%s] Loop write exit", s.id, s.SystemId())
 					return
 				case r := <-s.term.reqCh:
 					if s.write(r) {
-						s.logLoopWriteStop()
+						LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
 						return
 					}
 				}
@@ -313,35 +310,27 @@ func (s *Session) loopWrite() {
 			t := time.NewTicker(s.conf.EnquireLink)
 			defer func() {
 				t.Stop()
-				s.term.wg.Done()
+				s.term.swg.Done()
 			}()
 			for {
 				select {
 				case <-s.term.ctx.Done():
-					s.logLoopWriteExit()
+					LogDebug("[Session@%s:%s] Loop write exit", s.id, s.SystemId())
 					return
 				case r := <-s.term.reqCh:
 					if s.write(r) {
-						s.logLoopWriteStop()
+						LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
 						return
 					}
 				case <-t.C:
 					if s.write(s.newRequest(SubmitterSys, pdu.NewEnquireLink(), nil)) {
-						s.logLoopWriteStop()
+						LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
 						return
 					}
 				}
 			}
 		}()
 	}
-}
-
-func (s *Session) logLoopWriteExit() {
-	LogDebug("[Session@%s:%s] Loop write exit", s.id, s.SystemId())
-}
-
-func (s *Session) logLoopWriteStop() {
-	LogDebug("[Session@%s:%s] Loop write stop", s.id, s.SystemId())
 }
 
 func (s *Session) write(request *Request) bool {
@@ -363,7 +352,7 @@ func (s *Session) write(request *Request) bool {
 
 	// 若窗口已满，则等待窗口可用
 	if s.conf.WindowBlock != 0 {
-		for s.term.window.IsFull() {
+		for s.term.window.Full() {
 			if s.connClosed() { // 防止此协程不能退出
 				s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
 				return true
@@ -423,7 +412,7 @@ func (s *Session) loopClear() {
 		t := time.NewTicker(s.conf.WindowScan)
 		defer func() {
 			t.Stop()
-			s.term.wg.Done()
+			s.term.swg.Done()
 		}()
 		for {
 			select {
@@ -448,6 +437,20 @@ func (s *Session) loopClear() {
 	}()
 }
 
+func (s *Session) onDialed() {
+	s.store.AddSession(s)
+	if s.conf.OnDialed != nil {
+		s.conf.OnDialed(s)
+	}
+}
+
+func (s *Session) onClosed(reason string, desc string) {
+	s.store.DelSession(s.id)
+	if s.conf.OnClosed != nil {
+		s.conf.OnClosed(s, reason, desc)
+	}
+}
+
 func (s *Session) onReceive(p pdu.PDU) pdu.PDU {
 	if s.conf.OnReceive != nil {
 		return s.conf.OnReceive(s, p)
@@ -464,20 +467,6 @@ func (s *Session) onRequest(request *Request) {
 func (s *Session) onRespond(response *Response) {
 	if s.conf.OnRespond != nil && response.Request.submitter == SubmitterUser {
 		s.conf.OnRespond(s, response)
-	}
-}
-
-func (s *Session) onDialed() {
-	s.store.AddSession(s)
-	if s.conf.OnDialed != nil {
-		s.conf.OnDialed(s)
-	}
-}
-
-func (s *Session) onClosed(reason string, desc string) {
-	s.store.DelSession(s.id)
-	if s.conf.OnClosed != nil {
-		s.conf.OnClosed(s, reason, desc)
 	}
 }
 

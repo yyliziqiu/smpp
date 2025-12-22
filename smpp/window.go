@@ -9,10 +9,19 @@ import (
 )
 
 type Window interface {
-	IsFull() bool
+	Full() bool
 	Put(*Request) error
 	Take(int32) *Request
 	TakeTimeout() []*Request
+}
+
+func CreateWindow(typ int, size int, wait time.Duration) Window {
+	switch typ {
+	case 1:
+		return NewQueueWindow(size, wait)
+	default:
+		return NewMapWindow(size, wait)
+	}
 }
 
 // ============ MapWindow ============
@@ -32,19 +41,16 @@ func NewMapWindow(size int, wait time.Duration) Window {
 	}
 }
 
-func (w *MapWindow) GetData() map[int32]*Request {
+func (w *MapWindow) Full() bool {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return maps.Clone(w.data)
-}
-
-func (w *MapWindow) IsFull() bool {
-	w.mu.Lock()
-	full := len(w.data) >= w.size
+	full := w.full()
 	w.mu.Unlock()
 
 	return full
+}
+
+func (w *MapWindow) full() bool {
+	return len(w.data) >= w.size
 }
 
 func (w *MapWindow) Put(request *Request) error {
@@ -56,7 +62,7 @@ func (w *MapWindow) Put(request *Request) error {
 }
 
 func (w *MapWindow) put(request *Request) error {
-	if len(w.data) >= w.size {
+	if w.full() {
 		return ErrWindowFull
 	}
 
@@ -92,6 +98,13 @@ func (w *MapWindow) TakeTimeout() []*Request {
 	return requests
 }
 
+func (w *MapWindow) GetData() map[int32]*Request {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return maps.Clone(w.data)
+}
+
 // ============ QueueWindow ============
 
 type QueueWindow struct {
@@ -115,19 +128,16 @@ func NewQueueWindow(size int, wait time.Duration) Window {
 	}
 }
 
-func (w *QueueWindow) GetData() map[int32]*QueueWindowValue {
+func (w *QueueWindow) Full() bool {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return maps.Clone(w.data)
-}
-
-func (w *QueueWindow) IsFull() bool {
-	w.mu.Lock()
-	full := len(w.data) >= w.size
+	full := w.full()
 	w.mu.Unlock()
 
 	return full
+}
+
+func (w *QueueWindow) full() bool {
+	return len(w.data) >= w.size
 }
 
 func (w *QueueWindow) Put(request *Request) error {
@@ -139,13 +149,14 @@ func (w *QueueWindow) Put(request *Request) error {
 }
 
 func (w *QueueWindow) put(request *Request) error {
-	if len(w.data) >= w.size {
+	if w.full() {
 		return ErrWindowFull
 	}
 
 	value := &QueueWindowValue{
 		Request: request,
 	}
+
 	w.data[request.Pdu.GetSequenceNumber()] = value
 	w.queue.Push(value)
 
@@ -193,4 +204,11 @@ func (w *QueueWindow) TakeTimeout() []*Request {
 	w.mu.Unlock()
 
 	return list
+}
+
+func (w *QueueWindow) GetData() map[int32]*QueueWindowValue {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return maps.Clone(w.data)
 }
