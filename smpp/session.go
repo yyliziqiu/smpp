@@ -476,19 +476,19 @@ func (s *Session) onRespond(response *Response) {
 
 func (s *Session) debug(m string, a ...any) {
 	if s.logger != nil {
-		s.logger.Debugf(s.formatLog(m, a))
+		s.logger.Debugf(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) info(m string, a ...any) {
 	if s.logger != nil {
-		s.logger.Infof(s.formatLog(m, a))
+		s.logger.Infof(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) warn(m string, a ...any) {
 	if s.logger != nil {
-		s.logger.Warnf(s.formatLog(m, a))
+		s.logger.Warnf(s.formatLog(m, a...))
 	}
 }
 
