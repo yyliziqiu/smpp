@@ -119,7 +119,6 @@ func (s *Session) dial() error {
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
 	s.onDialed()
-
 	s.loopRead()
 	s.loopWrite()
 	s.loopClear()
