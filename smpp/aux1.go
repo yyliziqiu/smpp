@@ -1,12 +1,19 @@
 package smpp
 
 import (
+	"encoding/json"
+	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/sirupsen/logrus"
 )
 
 // ============ Logger ============
+
+var _logger *logrus.Logger
 
 func SetLogger(logger *logrus.Logger) {
 	_logger = logger
@@ -81,4 +88,25 @@ func Ucs2Message(s string) pdu.ShortMessage {
 func BinaryMessage(s []byte) pdu.ShortMessage {
 	sm, _ := pdu.NewBinaryShortMessageWithEncoding(s, data.BINARY8BIT2)
 	return sm
+}
+
+// ============ Debug ============
+
+func PrintPdu(tag string, systemId string, p pdu.PDU) {
+	if p != nil {
+		bs, _ := json.MarshalIndent(p, "", "  ")
+		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
+	}
+}
+
+func PrintMemory(tag string, gc bool) {
+	if gc {
+		runtime.GC()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	fmt.Printf("[memory:%s] alloc: %d KB\n", tag, memStats.Alloc/1024)
 }
