@@ -11,7 +11,7 @@ import (
 type Connection interface {
 	SelfAddr() string
 	PeerAddr() string
-	SetDeadline(time.Time) error
+	Deadline(time.Time) error
 	SystemId() string
 	BindType() pdu.BindingType
 	Dial() error
@@ -93,7 +93,7 @@ func (c *ClientConnection) PeerAddr() string {
 	return c.peerAddr
 }
 
-func (c *ClientConnection) SetDeadline(t time.Time) error {
+func (c *ClientConnection) Deadline(t time.Time) error {
 	return c.conn.SetDeadline(t)
 }
 
@@ -219,7 +219,7 @@ func (c *ServerConnection) PeerAddr() string {
 	return c.peerAddr
 }
 
-func (c *ServerConnection) SetDeadline(t time.Time) error {
+func (c *ServerConnection) Deadline(t time.Time) error {
 	return c.conn.SetDeadline(t)
 }
 
