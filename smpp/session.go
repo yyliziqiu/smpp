@@ -116,7 +116,7 @@ func (s *Session) dial() error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var window Window
-	if s.conf.WindowNewer == nil {
+	if s.conf.WindowNewer != nil {
 		window = s.conf.WindowNewer(s)
 	} else {
 		window = CreateWindow(s.conf.WindowType, s.conf.WindowSize, s.conf.WindowWait)
@@ -130,11 +130,12 @@ func (s *Session) dial() error {
 		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
-	s.term.swg.Add(3)
 
+	s.term.swg.Add(3)
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
 	s.onDialed()
+
 	s.loopRead()
 	s.loopWrite()
 	s.loopClear()
