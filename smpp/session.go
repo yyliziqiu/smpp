@@ -15,6 +15,28 @@ import (
 	"github.com/yyliziqiu/gdk/xuid"
 )
 
+const (
+	ConnectionDialed int32 = iota
+	ConnectionClosed
+)
+
+const (
+	SessionDialing = "dialing"
+	SessionActive  = "active"
+	SessionClosed  = "closed"
+)
+
+const (
+	CloseByError    = "error"
+	CloseByPdu      = "pdu"
+	CloseByExplicit = "explicit"
+)
+
+const (
+	SubmitterSys int8 = iota
+	SubmitterUser
+)
+
 type Session struct {
 	id     string         //
 	logger *logrus.Logger //
