@@ -11,7 +11,6 @@ import (
 
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/sirupsen/logrus"
-	"github.com/yyliziqiu/gdk/xtime"
 	"github.com/yyliziqiu/gdk/xuid"
 )
 
@@ -437,13 +436,13 @@ func (s *Session) loopClear() {
 		for {
 			select {
 			case <-s.term.ctx.Done():
-				s.debug("Loop window exit")
+				s.debug("Loop clear exit")
 				return
 			case <-t.C:
 				if s.connClosed() {
-					break
+					s.debug("Loop clear stop")
+					return
 				}
-				timer := xtime.NewTimer()
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
 					if s.connClosed() {
@@ -451,7 +450,7 @@ func (s *Session) loopClear() {
 					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 				}
-				s.debug("Handled timeout requests, count: %d, cost: %s", len(requests), timer.Stops())
+				s.debug("Handled timeout requests, count: %d", len(requests))
 			}
 		}
 	}()
