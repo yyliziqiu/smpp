@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 
 func prepare() {
 	_ = xlog.Init(xlog.Config{Path: "/private/ws/self/smpp"})
-	smpp.SetLogger(xlog.New3("assist"))
+	smpp.SetLog(xlog.New3("assist"))
 }
 
 func finally(code int) {

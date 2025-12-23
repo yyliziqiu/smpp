@@ -13,10 +13,10 @@ import (
 
 // ============ Logger ============
 
-var _logger *logrus.Logger
+var _log *logrus.Logger
 
-func SetLogger(logger *logrus.Logger) {
-	_logger = logger
+func SetLog(log *logrus.Logger) {
+	_log = log
 }
 
 // ============ Session ============
