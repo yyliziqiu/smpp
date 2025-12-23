@@ -16,25 +16,19 @@ import (
 )
 
 const (
-	ConnectionDialed int32 = iota
-	ConnectionClosed
-)
+	ConnectionClosed = 0
+	ConnectionDialed = 1
 
-const (
+	SubmitterSys  = 1
+	SubmitterUser = 2
+
 	SessionDialing = "dialing"
 	SessionActive  = "active"
 	SessionClosed  = "closed"
-)
 
-const (
 	CloseByError    = "error"
 	CloseByPdu      = "pdu"
 	CloseByExplicit = "explicit"
-)
-
-const (
-	SubmitterSys int8 = iota
-	SubmitterUser
 )
 
 type Session struct {

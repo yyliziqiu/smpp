@@ -20,11 +20,11 @@ type Connection interface {
 	Close(bool) error
 }
 
-func ConnAddrs(conn net.Conn) (string, string) {
+func ConnectionAddrs(conn net.Conn) (string, string) {
 	return conn.LocalAddr().String(), conn.RemoteAddr().String()
 }
 
-func ConnRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
+func ConnectionRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
 	if timeout > 0 {
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 			return nil, err
@@ -34,7 +34,7 @@ func ConnRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
 	return pdu.Parse(conn)
 }
 
-func ConnWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
+func ConnectionWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
 	buf := pdu.NewBuffer(make([]byte, 0, 32))
 	pd.Marshal(buf)
 
@@ -47,10 +47,10 @@ func ConnWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
 	return conn.Write(buf.Bytes())
 }
 
-func ConnClose(conn net.Conn, bye bool) error {
+func ConnectionClose(conn net.Conn, bye bool) error {
 	if bye {
 		// 主动断开链接时，发送解绑请求
-		_, _ = ConnWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
+		_, _ = ConnectionWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
 		// 防止对端响应 unbind-resp 时 reset
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -119,7 +119,7 @@ func (c *ClientConnection) Dial() error {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
+	c.selfAddr, c.peerAddr = ConnectionAddrs(c.conn)
 
 	// 绑定账号
 	err = c.bind()
@@ -177,15 +177,15 @@ func (c *ClientConnection) bind() error {
 }
 
 func (c *ClientConnection) Read() (pdu.PDU, error) {
-	return ConnRead(c.conn, c.conf.ReadTimeout)
+	return ConnectionRead(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ClientConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
+	return ConnectionWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ClientConnection) Close(bye bool) error {
-	return ConnClose(c.conn, bye)
+	return ConnectionClose(c.conn, bye)
 }
 
 // ============ Server ============
@@ -246,7 +246,7 @@ func (c *ServerConnection) dial() error {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
+	c.selfAddr, c.peerAddr = ConnectionAddrs(c.conn)
 
 	// 获取绑定请求
 	var (
@@ -290,13 +290,13 @@ func (c *ServerConnection) dial() error {
 }
 
 func (c *ServerConnection) Read() (pdu.PDU, error) {
-	return ConnRead(c.conn, c.conf.ReadTimeout)
+	return ConnectionRead(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ServerConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
+	return ConnectionWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ServerConnection) Close(bye bool) error {
-	return ConnClose(c.conn, bye)
+	return ConnectionClose(c.conn, bye)
 }
