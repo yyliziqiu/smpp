@@ -9,9 +9,8 @@ import (
 type Dial func(addr string) (net.Conn, error)
 
 var (
-	DefaultDial = TcpDial(30 * time.Second)
-
-	DefaultTlsDial = TlsDial("", 30*time.Second)
+	DefaultDial        = TcpDial(30 * time.Second)
+	DefaultDialWithTls = TlsDial("", 30*time.Second)
 )
 
 func TcpDial(timeout time.Duration) Dial {
