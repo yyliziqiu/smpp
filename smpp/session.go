@@ -165,7 +165,7 @@ func (s *Session) close(reason string, desc string) {
 		time.Sleep(100 * time.Millisecond)
 
 		// 让正在阻塞中的读写操作超时退出
-		_ = s.conn.SetDeadline(time.Now().Add(200 * time.Millisecond))
+		_ = s.conn.SetDeadline(time.Now().Add(100 * time.Millisecond))
 
 		// 等待读写协程停止
 		s.term.swg.Wait()

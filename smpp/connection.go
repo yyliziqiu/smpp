@@ -51,7 +51,7 @@ func ConnectionClose(conn net.Conn, bye bool) error {
 	if bye {
 		// 主动断开链接时，发送解绑请求
 		_, _ = ConnectionWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
-		// 防止对端响应 unbind-resp 时 reset
+		// 防止对端响应 unbind-resp 时 reset。不读取 unbind-resp，直接关闭链接
 		time.Sleep(100 * time.Millisecond)
 	}
 	return conn.Close()
