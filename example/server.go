@@ -14,7 +14,7 @@ import (
 )
 
 func StartServer() {
-	listen, err := net.Listen("tcp", ":10088")
+	listen, err := net.Listen("tcp", ":10032")
 	if err != nil {
 		panic(err)
 	}
