@@ -17,7 +17,7 @@ func StartClient() {
 	// create client connection
 	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
 		// Dial:     smpp.DefaultTlsDial, // connect by tls
-		Smsc:     "127.0.0.1:10088",
+		Smsc:     "127.0.0.1:10032",
 		SystemId: "user1",
 		Password: "user1",
 		BindType: pdu.Transceiver,
