@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 }
 
 func prepare() {
-	_ = xlog.Init(xlog.Config{Path: "/private/ws/self/smpp"})
+	_ = xlog.Init(xlog.Config{Console: true})
 	SetLog(xlog.New3("smpp"))
 }
 
@@ -86,7 +86,7 @@ func submitSmPdu() *pdu.SubmitSM {
 }
 
 func TestServerSession(t *testing.T) {
-	listen, err := net.Listen("tcp", ":10088")
+	listen, err := net.Listen("tcp", ":10032")
 	if err != nil {
 		panic(err)
 	}
@@ -142,7 +142,7 @@ func accept(conn net.Conn) {
 	}
 
 	// 测试写
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 1; i++ {
 		_ = sess.Write(deliverSmPdu(), nil)
 	}
 

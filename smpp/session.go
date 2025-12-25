@@ -134,7 +134,6 @@ func (s *Session) dial() error {
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
 	s.onDialed()
-
 	s.loopRead()
 	s.loopWrite()
 	s.loopClear()
@@ -306,9 +305,9 @@ func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
 }
 
 func (s *Session) loopWrite() {
-	if s.conf.EnquireLink == 0 {
-		go func() {
-			defer s.term.swg.Done()
+	go func() {
+		defer s.term.swg.Done()
+		if s.conf.EnquireLink == 0 {
 			for {
 				select {
 				case <-s.term.ctx.Done():
@@ -319,14 +318,9 @@ func (s *Session) loopWrite() {
 					}
 				}
 			}
-		}()
-	} else {
-		go func() {
-			t := time.NewTicker(s.conf.EnquireLink)
-			defer func() {
-				t.Stop()
-				s.term.swg.Done()
-			}()
+		} else {
+			tk := time.NewTicker(s.conf.EnquireLink)
+			defer tk.Stop()
 			for {
 				select {
 				case <-s.term.ctx.Done():
@@ -335,14 +329,14 @@ func (s *Session) loopWrite() {
 					if s.write(r) {
 						return
 					}
-				case <-t.C:
+				case <-tk.C:
 					if s.write(s.newRequest(SubmitterSys, pdu.NewEnquireLink(), nil)) {
 						return
 					}
 				}
 			}
-		}()
-	}
+		}
+	}()
 }
 
 func (s *Session) write(request *Request) bool {
@@ -421,16 +415,14 @@ func (s *Session) allowWrite(p pdu.PDU) bool {
 
 func (s *Session) loopClear() {
 	go func() {
-		t := time.NewTicker(s.conf.WindowScan)
-		defer func() {
-			t.Stop()
-			s.term.swg.Done()
-		}()
+		defer s.term.swg.Done()
+		tk := time.NewTicker(s.conf.WindowScan)
+		defer tk.Stop()
 		for {
 			select {
 			case <-s.term.ctx.Done():
 				return
-			case <-t.C:
+			case <-tk.C:
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
 					if s.connClosed() {
