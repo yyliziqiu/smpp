@@ -32,7 +32,7 @@ const (
 
 type Session struct {
 	id     string         //
-	log    *logrus.Logger //
+	slog   *logrus.Logger //
 	store  *SessionStore  //
 	conn   Connection     //
 	conf   *SessionConfig //
@@ -47,7 +47,7 @@ type SessionTerm struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	window Window
-	reqCh  chan *Request
+	sendCh chan *Request
 	dialAt time.Time
 }
 
@@ -82,7 +82,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 	// 创建 session
 	s := &Session{
 		id:     xuid.Get(),
-		log:    _log,
+		slog:   _slog,
 		store:  _store,
 		conn:   conn,
 		conf:   &conf,
@@ -126,7 +126,7 @@ func (s *Session) dial() error {
 		ctx:    ctx,
 		cancel: cancel,
 		window: window,
-		reqCh:  make(chan *Request, 1),
+		sendCh: make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
 
@@ -174,8 +174,8 @@ func (s *Session) close(reason string, desc string) {
 		_ = s.conn.Close(reason == CloseByExplicit)
 
 		// 清理会话数据
-		close(s.term.reqCh)
-		for request := range s.term.reqCh {
+		close(s.term.sendCh)
+		for request := range s.term.sendCh {
 			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
 		}
 		s.term.window = nil
@@ -219,11 +219,9 @@ func (s *Session) loopRead() {
 		for {
 			select {
 			case <-s.term.ctx.Done():
-				s.debug("Loop read exit")
 				return
 			default:
 				if s.read() {
-					s.debug("Loop read stop")
 					return
 				}
 			}
@@ -293,7 +291,7 @@ func (s *Session) allowRead(_ pdu.PDU) bool {
 }
 
 func (s *Session) writeToQueue(submitter int8, p pdu.PDU, data any) {
-	s.term.reqCh <- s.newRequest(submitter, p, data)
+	s.term.sendCh <- s.newRequest(submitter, p, data)
 }
 
 func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
@@ -314,11 +312,9 @@ func (s *Session) loopWrite() {
 			for {
 				select {
 				case <-s.term.ctx.Done():
-					s.debug("Loop write exit")
 					return
-				case r := <-s.term.reqCh:
+				case r := <-s.term.sendCh:
 					if s.write(r) {
-						s.debug("Loop write stop")
 						return
 					}
 				}
@@ -334,16 +330,13 @@ func (s *Session) loopWrite() {
 			for {
 				select {
 				case <-s.term.ctx.Done():
-					s.debug("Loop write exit")
 					return
-				case r := <-s.term.reqCh:
+				case r := <-s.term.sendCh:
 					if s.write(r) {
-						s.debug("Loop write stop")
 						return
 					}
 				case <-t.C:
 					if s.write(s.newRequest(SubmitterSys, pdu.NewEnquireLink(), nil)) {
-						s.debug("Loop write stop")
 						return
 					}
 				}
@@ -436,17 +429,12 @@ func (s *Session) loopClear() {
 		for {
 			select {
 			case <-s.term.ctx.Done():
-				s.debug("Loop clear exit")
 				return
 			case <-t.C:
-				if s.connClosed() {
-					s.debug("Loop clear stop")
-					return
-				}
 				requests := s.term.window.TakeTimeout()
 				for _, request := range requests {
 					if s.connClosed() {
-						break
+						return
 					}
 					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 				}
@@ -490,20 +478,20 @@ func (s *Session) onRespond(response *Response) {
 }
 
 func (s *Session) debug(m string, a ...any) {
-	if s.log != nil {
-		s.log.Debugf(s.formatLog(m, a...))
+	if s.slog != nil {
+		s.slog.Debugf(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) info(m string, a ...any) {
-	if s.log != nil {
-		s.log.Infof(s.formatLog(m, a...))
+	if s.slog != nil {
+		s.slog.Infof(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) warn(m string, a ...any) {
-	if s.log != nil {
-		s.log.Warnf(s.formatLog(m, a...))
+	if s.slog != nil {
+		s.slog.Warnf(s.formatLog(m, a...))
 	}
 }
 
