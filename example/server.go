@@ -19,7 +19,7 @@ func StartServer() {
 		panic(err)
 	}
 
-	fmt.Println("Start server on port 10088...")
+	fmt.Println("Start server on port 10032...")
 
 	for {
 		conn, err := listen.Accept()
