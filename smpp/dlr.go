@@ -9,6 +9,7 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
+	"github.com/yyliziqiu/gdk/xconv"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 var (
 	ErrInvalidDlrFormat = errors.New("invalid dlr format")
 
-	dlrMatches     = regexp.MustCompile(`^id:([\w\-]+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\w+) err:(\w+)$`)
+	dlrRegexp      = regexp.MustCompile(`^id:([\w\-]+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\w+) err:(\w+)$`)
 	dlrFormat      = "id:%s sub:%s dlvrd:%s submit date:%s done date:%s stat:%s err:%s text:%s"
 	dlrDateFormat1 = "0601021504"
 	dlrDateFormat2 = "060102150405"
@@ -55,52 +56,83 @@ func (r *Dlr) Pdu(source string, dest string) *pdu.DeliverSM {
 	return p
 }
 
-func ParseDlr(s string) (*Dlr, error) {
+func ParseDlr(s string) (Dlr, error) {
 	i := strings.Index(s, " text:")
 	if i == -1 {
 		i = strings.Index(s, " Text:")
 		if i == -1 {
-			return nil, ErrInvalidDlrFormat
+			return Dlr{}, ErrInvalidDlrFormat
 		}
 	}
 
-	match := dlrMatches.FindStringSubmatch(s[:i])
+	match := dlrRegexp.FindStringSubmatch(s[:i])
 	if len(match) != 8 {
-		return nil, ErrInvalidDlrFormat
+		return Dlr{}, ErrInvalidDlrFormat
 	}
 
-	date1, err := parseDlrDate(match[4])
-	if err != nil {
-		return nil, ErrInvalidDlrFormat
-	}
-	date2, err := parseDlrDate(match[5])
-	if err != nil {
-		return nil, ErrInvalidDlrFormat
-	}
 	text := ""
 	if len(s) > i+6 {
 		text = s[i+6:]
 	}
 
-	return &Dlr{
+	return Dlr{
 		Id:    match[1],
 		Sub:   match[2],
 		Dlvrd: match[3],
-		Sd:    date1,
-		Dd:    date2,
+		Sd:    parseDlrDate(match[4]),
+		Dd:    parseDlrDate(match[5]),
 		Stat:  match[6],
 		Err:   match[7],
 		Text:  text,
 	}, nil
 }
 
-func parseDlrDate(s string) (time.Time, error) {
+func parseDlrDate(s string) time.Time {
 	date, err := time.Parse(dlrDateFormat1, s)
-	if err != nil {
-		date, err = time.Parse(dlrDateFormat2, s)
-		if err != nil {
-			return time.Now(), ErrInvalidDlrFormat
-		}
+	if err == nil {
+		return date
 	}
-	return date, nil
+
+	date, err = time.Parse(dlrDateFormat2, s)
+	if err == nil {
+		return date
+	}
+
+	if len(s) == 10 {
+		return time.Unix(xconv.S2I64(s), 0)
+	} else if len(s) == 13 {
+		return time.Unix(xconv.S2I64(s)/1000, 0)
+	} else {
+		return time.Time{}
+	}
+}
+
+// BuildDlr
+// sub   分片序号
+// dlvrd 分片总数
+func BuildDlr(id string, sub int, dlvrd int, stat string, err int) Dlr {
+	curr := time.Now()
+	return Dlr{
+		Id:    id,
+		Sub:   buildDlrNum(sub),
+		Dlvrd: buildDlrNum(dlvrd),
+		Sd:    curr,
+		Dd:    curr,
+		Stat:  stat,
+		Err:   buildDlrNum(err),
+		Text:  stat,
+	}
+}
+
+func buildDlrNum(n int) string {
+	if n < 0 || n > 999 {
+		return "999"
+	}
+	b := make([]byte, 3)
+	b[2] = byte('0' + n%10)
+	n /= 10
+	b[1] = byte('0' + n%10)
+	n /= 10
+	b[0] = byte('0' + n%10)
+	return string(b)
 }
