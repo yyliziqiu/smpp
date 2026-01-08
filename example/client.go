@@ -85,7 +85,7 @@ func submitSmPdu() *pdu.SubmitSM {
 }
 
 func exit() {
-	exitCh := make(chan os.Signal)
+	exitCh := make(chan os.Signal, 1)
 	signal.Notify(exitCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-exitCh
 }
