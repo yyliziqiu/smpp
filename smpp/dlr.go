@@ -92,19 +92,17 @@ func parseDlrDate(s string) time.Time {
 	if err == nil {
 		return date
 	}
-
 	date, err = time.Parse(dlrDateFormat2, s)
 	if err == nil {
 		return date
 	}
-
 	if len(s) == 10 {
 		return time.Unix(xconv.S2I64(s), 0)
-	} else if len(s) == 13 {
-		return time.Unix(xconv.S2I64(s)/1000, 0)
-	} else {
-		return time.Time{}
 	}
+	if len(s) == 13 {
+		return time.Unix(xconv.S2I64(s)/1000, 0)
+	}
+	return time.Unix(0, 0)
 }
 
 // BuildDlr
