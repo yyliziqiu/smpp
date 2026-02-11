@@ -7,7 +7,7 @@ toolchain go1.24.6
 require (
 	github.com/linxGnu/gosmpp v0.3.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/yyliziqiu/gdk v1.0.1
+	github.com/yyliziqiu/gdk v1.0.7
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 )
 
