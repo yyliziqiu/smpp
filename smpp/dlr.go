@@ -102,7 +102,7 @@ func parseDlrDate(s string) time.Time {
 	if len(s) == 13 {
 		return time.Unix(xconv.S2I64(s)/1000, 0)
 	}
-	return time.Unix(0, 0)
+	return time.Now()
 }
 
 // BuildDlr

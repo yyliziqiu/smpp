@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
@@ -109,4 +111,65 @@ func PrintMemory(tag string, gc bool) {
 	runtime.ReadMemStats(&memStats)
 
 	fmt.Printf("[memory:%s] alloc: %d KB\n", tag, memStats.Alloc/1024)
+}
+
+// ============ Other ============
+
+const (
+	Gsm7bitBasicChars = " .,:;!?'()+-*/_%&#<=>@£$¥\"\n\r\fØøÅåΔΦΓΛΩΠΨΣΘΞÆæßÉ¤ÄÖÑÜ§¿äöñüàèéùìòÇ" // 62 + 65 = 127
+	Gsm7bitExtraChars = "[]{}^~|€\\"                                                            // 9
+)
+
+func DetectMessage(s string) (int, int, bool) {
+	isGsm := true
+	extra := 0
+	for _, r := range s {
+		if !IsGsm7bitBasicChar(r) {
+			if IsGsm7bitExtraChar(r) {
+				extra++
+			} else {
+				isGsm = false
+				break
+			}
+		}
+	}
+
+	var msgLen, maxLen, segLen int
+	if isGsm {
+		msgLen = utf8.RuneCountInString(s) + extra
+		maxLen = 160
+		segLen = 153
+	} else {
+		msgLen = utf8.RuneCountInString(s)
+		maxLen = 70
+		segLen = 67
+	}
+
+	slices := 1
+	if msgLen > maxLen {
+		offset := 0
+		if msgLen%segLen > 0 {
+			offset = 1
+		}
+		slices = msgLen/segLen + offset
+	}
+
+	return msgLen, slices, isGsm
+}
+
+func IsGsm7bitBasicChar(r rune) bool {
+	if r >= 'a' && r <= 'z' {
+		return true
+	}
+	if r >= '0' && r <= '9' {
+		return true
+	}
+	if r >= 'A' && r <= 'Z' {
+		return true
+	}
+	return strings.ContainsRune(Gsm7bitBasicChars, r)
+}
+
+func IsGsm7bitExtraChar(r rune) bool {
+	return strings.ContainsRune(Gsm7bitExtraChars, r)
 }
