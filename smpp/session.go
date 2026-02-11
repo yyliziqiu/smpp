@@ -356,27 +356,24 @@ func (s *Session) write(request *Request) bool {
 		return false
 	}
 
-	// 若窗口已满，则等待窗口可用
-	if s.conf.WindowBlock != 0 {
-		for s.term.window.Full() {
-			if s.connClosed() { // 防止此协程不能退出
-				s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
-				return true
-			}
-			if s.conf.WindowBlock > 0 {
-				time.Sleep(s.conf.WindowBlock)
-			} else {
-				runtime.Gosched()
+	// 可以响应的 pdu 需要添加到窗口中
+	request.SubmitAt = time.Now().Unix()
+	if request.Pdu.CanResponse() {
+		// 若窗口已满，则等待窗口可用
+		if s.conf.WindowBlock != 0 {
+			for s.term.window.Full() {
+				if s.connClosed() { // 防止此协程不能退出
+					s.onRespond(NewResponse(request, nil, ErrConnectionClosed))
+					return true
+				}
+				if s.conf.WindowBlock > 0 {
+					time.Sleep(s.conf.WindowBlock)
+				} else {
+					runtime.Gosched()
+				}
 			}
 		}
-	}
-
-	// 执行回调
-	request.SubmitAt = time.Now().Unix()
-	s.onRequest(request)
-
-	// 可以响应的 pdu 需要添加到窗口中
-	if request.Pdu.CanResponse() {
+		// 将请求添加至窗口
 		err := s.term.window.Put(request)
 		if err != nil {
 			s.warn("Put request to window failed, error: %v", err)
@@ -384,6 +381,9 @@ func (s *Session) write(request *Request) bool {
 			return false
 		}
 	}
+
+	// 执行回调
+	s.onRequest(request)
 
 	// 发送 pdu
 	n, err := s.conn.Write(request.Pdu)
