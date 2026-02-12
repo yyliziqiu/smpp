@@ -18,8 +18,8 @@ const (
 	ConnectionClosed = 0
 	ConnectionDialed = 1
 
-	SubmitterSys  = 1
-	SubmitterUser = 2
+	SubmitBySys = 1
+	SubmitByUsr = 2
 
 	SessionDialing = "dialing"
 	SessionActive  = "active"
@@ -47,7 +47,8 @@ type SessionTerm struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	window Window
-	sendCh chan *Request
+	pduCh  chan pdu.PDU
+	reqCh  chan *Request
 	dialAt time.Time
 }
 
@@ -68,18 +69,23 @@ type SessionConfig struct {
 	OnRespond   func(*Session, *Response)       // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
 }
 
-func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
+func NewSession(conn Connection, cfg SessionConfig) (*Session, error) {
+	// 设置默认参数
+	conf := cfg
+	if conf.WindowNewer == nil {
+		conf.WindowNewer = CreateWindow
+	}
 	if conf.WindowSize == 0 {
-		conf.WindowSize = 64
+		conf.WindowSize = 32
 	}
 	if conf.WindowWait == 0 {
-		conf.WindowWait = time.Minute
+		conf.WindowWait = 30 * time.Second
 	}
 	if conf.WindowScan == 0 {
-		conf.WindowScan = time.Minute
+		conf.WindowScan = 60 * time.Second
 	}
 
-	// 创建 session
+	// 创建会话
 	s := &Session{
 		id:     xuid.Get(),
 		slog:   _slog,
@@ -92,7 +98,7 @@ func NewSession(conn Connection, conf SessionConfig) (*Session, error) {
 		initAt: time.Now(),
 	}
 
-	// 连接
+	// 建立链接
 	err := s.dial()
 	if err != nil {
 		return nil, err
@@ -111,10 +117,6 @@ func (s *Session) dial() error {
 		return err
 	}
 
-	if s.conf.WindowNewer == nil {
-		s.conf.WindowNewer = CreateWindow
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s.term = &SessionTerm{
@@ -122,30 +124,23 @@ func (s *Session) dial() error {
 		ctx:    ctx,
 		cancel: cancel,
 		window: s.conf.WindowNewer(s),
-		sendCh: make(chan *Request, 1),
+		pduCh:  make(chan pdu.PDU, 1),
+		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
 	s.term.swg.Add(4)
 
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
-	s.loopRead()
-	s.loopSend()
-	s.loopWrite()
-	s.loopClear()
+	go s.loopRead()
+	go s.loopWrite()
+	go s.loopSend()
+	go s.loopClear()
 
 	s.onDialed()
 	s.info("Dial succeed, peer addr: %s", s.PeerAddr())
 
 	return nil
-}
-
-func (s *Session) connDialed() bool {
-	return atomic.LoadInt32(&s.status) == ConnectionDialed
-}
-
-func (s *Session) connClosed() bool {
-	return atomic.LoadInt32(&s.status) == ConnectionClosed
 }
 
 func (s *Session) close(reason string, desc string) {
@@ -170,8 +165,9 @@ func (s *Session) close(reason string, desc string) {
 		_ = s.conn.Close(reason == CloseByExplicit)
 
 		// 清理会话数据
-		close(s.term.sendCh)
-		for request := range s.term.sendCh {
+		close(s.term.pduCh)
+		close(s.term.reqCh)
+		for request := range s.term.reqCh {
 			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
 		}
 		s.term.window = nil
@@ -210,19 +206,17 @@ func (s *Session) close(reason string, desc string) {
 }
 
 func (s *Session) loopRead() {
-	go func() {
-		defer s.term.swg.Done()
-		for {
-			select {
-			case <-s.term.ctx.Done():
+	defer s.term.swg.Done()
+	for {
+		select {
+		case <-s.term.ctx.Done():
+			return
+		default:
+			if s.read() {
 				return
-			default:
-				if s.read() {
-					return
-				}
 			}
 		}
-	}()
+	}
 }
 
 func (s *Session) read() bool {
@@ -240,14 +234,14 @@ func (s *Session) read() bool {
 	switch p.(type) {
 	case *pdu.EnquireLink:
 		s.debug("Received enquire link pdu")
-		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
+		s.pushPdu(p.GetResponse())
 		return false
 	case *pdu.EnquireLinkResp:
 		s.term.window.Take(p.GetSequenceNumber())
 		return false
 	case *pdu.Unbind:
 		s.info("Received unbind pdu")
-		s.writeToQueue(SubmitterSys, p.GetResponse(), nil)
+		s.pushPdu(p.GetResponse())
 		s.close(CloseByPdu, "received unbind pdu")
 		return true
 	case *pdu.UnbindResp:
@@ -267,9 +261,8 @@ func (s *Session) read() bool {
 
 	// AlertNotification, Outbind, GenericNack 这3类 pdu 没有对应的 resp
 	if p.CanResponse() {
-		rp := s.onReceive(p)
-		if rp != nil {
-			s.writeToQueue(SubmitterSys, rp, nil)
+		if rp := s.onReceive(p); rp != nil {
+			s.pushPdu(rp)
 		}
 	} else {
 		tr := s.term.window.Take(p.GetSequenceNumber())
@@ -286,61 +279,76 @@ func (s *Session) allowRead(_ pdu.PDU) bool {
 	return true
 }
 
-func (s *Session) writeToQueue(submitter int8, p pdu.PDU, data any) {
-	s.term.sendCh <- s.newRequest(submitter, p, data)
-}
-
-func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
-	return &Request{
-		Pdu:       p,
-		TraceData: data,
-		SessionId: s.id,
-		SystemId:  s.conn.SystemId(),
-		SubmitAt:  0,
-		submitter: submitter,
+func (s *Session) loopWrite() {
+	defer s.term.swg.Done()
+	for {
+		select {
+		case <-s.term.ctx.Done():
+			return
+		case p := <-s.term.pduCh:
+			if s.write(p) {
+				return
+			}
+		}
 	}
 }
 
-func (s *Session) loopSend() {
+func (s *Session) write(p pdu.PDU) bool {
+	if s.connClosed() {
+		return true
+	}
 
+	if n, err := s.conn.Write(p); err != nil {
+		s.warn("Write failed, error: %v", err)
+		if n > 0 {
+			s.close(CloseByError, err.Error())
+			return true
+		} else {
+			if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
+				s.close(CloseByError, err.Error())
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
-func (s *Session) loopWrite() {
-	go func() {
-		defer s.term.swg.Done()
-		if s.conf.EnquireLink == 0 {
-			for {
-				select {
-				case <-s.term.ctx.Done():
+func (s *Session) loopSend() {
+	defer s.term.swg.Done()
+	if s.conf.EnquireLink == 0 {
+		for {
+			select {
+			case <-s.term.ctx.Done():
+				return
+			case r := <-s.term.reqCh:
+				if s.send(r) {
 					return
-				case r := <-s.term.sendCh:
-					if s.write(r) {
-						return
-					}
-				}
-			}
-		} else {
-			tk := time.NewTicker(s.conf.EnquireLink)
-			defer tk.Stop()
-			for {
-				select {
-				case <-s.term.ctx.Done():
-					return
-				case r := <-s.term.sendCh:
-					if s.write(r) {
-						return
-					}
-				case <-tk.C:
-					if s.write(s.newRequest(SubmitterSys, pdu.NewEnquireLink(), nil)) {
-						return
-					}
 				}
 			}
 		}
-	}()
+	} else {
+		tk := time.NewTicker(s.conf.EnquireLink)
+		defer tk.Stop()
+		for {
+			select {
+			case <-s.term.ctx.Done():
+				return
+			case <-tk.C:
+				if s.send(s.newRequest(SubmitBySys, pdu.NewEnquireLink(), nil)) {
+					return
+				}
+			case r := <-s.term.reqCh:
+				if s.send(r) {
+					return
+				}
+			}
+		}
+	}
 }
 
-func (s *Session) write(request *Request) bool {
+func (s *Session) send(request *Request) bool {
+	// 若 request == nil，说明通道已关闭
 	if request == nil {
 		return true
 	}
@@ -352,7 +360,7 @@ func (s *Session) write(request *Request) bool {
 	}
 
 	// 判断 pdu 是否可以发送
-	if !s.allowWrite(request.Pdu) {
+	if !s.allowSend(request.Pdu) {
 		s.onRespond(NewResponse(request, nil, ErrNotAllowed))
 		return false
 	}
@@ -383,29 +391,14 @@ func (s *Session) write(request *Request) bool {
 		}
 	}
 
-	// 执行回调
-	s.onRequest(request)
-
 	// 发送 pdu
-	n, err := s.conn.Write(request.Pdu)
-	if err != nil {
-		s.warn("Write failed, error: %v", err)
-		s.onRespond(NewResponse(request, nil, err))
-		if n > 0 {
-			s.close(CloseByError, err.Error())
-			return true
-		} else {
-			if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
-				s.close(CloseByError, err.Error())
-				return true
-			}
-		}
-	}
+	s.onRequest(request)
+	s.pushPdu(request.Pdu)
 
 	return false
 }
 
-func (s *Session) allowWrite(p pdu.PDU) bool {
+func (s *Session) allowSend(p pdu.PDU) bool {
 	switch p.(type) {
 	case *pdu.BindRequest, *pdu.Unbind, *pdu.Outbind, *pdu.GenericNack, *pdu.AlertNotification:
 		return false
@@ -415,26 +408,24 @@ func (s *Session) allowWrite(p pdu.PDU) bool {
 }
 
 func (s *Session) loopClear() {
-	go func() {
-		defer s.term.swg.Done()
-		tk := time.NewTicker(s.conf.WindowScan)
-		defer tk.Stop()
-		for {
-			select {
-			case <-s.term.ctx.Done():
-				return
-			case <-tk.C:
-				requests := s.term.window.TakeTimeout()
-				for _, request := range requests {
-					if s.connClosed() {
-						return
-					}
-					s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
+	defer s.term.swg.Done()
+	tk := time.NewTicker(s.conf.WindowScan)
+	defer tk.Stop()
+	for {
+		select {
+		case <-s.term.ctx.Done():
+			return
+		case <-tk.C:
+			requests := s.term.window.TakeTimeout()
+			for _, request := range requests {
+				if s.connClosed() {
+					return
 				}
-				s.debug("Handled timeout requests, count: %d", len(requests))
+				s.onRespond(NewResponse(request, nil, ErrResponseTimeout))
 			}
+			s.debug("Handled timeout requests, count: %d", len(requests))
 		}
-	}()
+	}
 }
 
 func (s *Session) onDialed() {
@@ -459,15 +450,42 @@ func (s *Session) onReceive(p pdu.PDU) pdu.PDU {
 }
 
 func (s *Session) onRequest(request *Request) {
-	if s.conf.OnRequest != nil && request.submitter == SubmitterUser {
+	if s.conf.OnRequest != nil && request.submitter == SubmitByUsr {
 		s.conf.OnRequest(s, request)
 	}
 }
 
 func (s *Session) onRespond(response *Response) {
-	if s.conf.OnRespond != nil && response.Request.submitter == SubmitterUser {
+	if s.conf.OnRespond != nil && response.Request.submitter == SubmitByUsr {
 		s.conf.OnRespond(s, response)
 	}
+}
+
+func (s *Session) pushPdu(p pdu.PDU) {
+	s.term.pduCh <- p
+}
+
+func (s *Session) pushRequest(submitter int8, p pdu.PDU, data any) {
+	s.term.reqCh <- s.newRequest(submitter, p, data)
+}
+
+func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
+	return &Request{
+		Pdu:       p,
+		TraceData: data,
+		SessionId: s.id,
+		SystemId:  s.conn.SystemId(),
+		SubmitAt:  0,
+		submitter: submitter,
+	}
+}
+
+func (s *Session) connDialed() bool {
+	return atomic.LoadInt32(&s.status) == ConnectionDialed
+}
+
+func (s *Session) connClosed() bool {
+	return atomic.LoadInt32(&s.status) == ConnectionClosed
 }
 
 func (s *Session) debug(m string, a ...any) {
@@ -520,6 +538,10 @@ func (s *Session) DialAt() time.Time {
 	return s.term.dialAt
 }
 
+func (s *Session) GetWindow() Window {
+	return s.term.window
+}
+
 func (s *Session) GetContext() any {
 	return s.conf.Context
 }
@@ -528,16 +550,12 @@ func (s *Session) SetContext(ctx any) {
 	s.conf.Context = ctx
 }
 
-func (s *Session) GetWindow() Window {
-	return s.term.window
-}
-
 func (s *Session) Write(p pdu.PDU, data any) error {
 	if s.connClosed() {
 		return ErrConnectionClosed
 	}
 
-	s.writeToQueue(SubmitterUser, p, data)
+	s.pushRequest(SubmitByUsr, p, data)
 
 	return nil
 }
@@ -545,16 +563,6 @@ func (s *Session) Write(p pdu.PDU, data any) error {
 func (s *Session) Close() {
 	atomic.StoreInt32(&s.closed, 1)
 	s.close(CloseByExplicit, "")
-}
-
-func (s *Session) IsActive() bool {
-	return s.connDialed()
-}
-
-func (s *Session) Closed() bool {
-	c1 := atomic.LoadInt32(&s.closed) == 1          // 显示关闭会话
-	c2 := s.conf.AttemptDial == 0 && s.connClosed() // 或连接已关闭并且没有开启重连
-	return c1 || c2
 }
 
 func (s *Session) Status() string {
@@ -565,4 +573,14 @@ func (s *Session) Status() string {
 		return SessionDialing
 	}
 	return SessionActive
+}
+
+func (s *Session) IsActive() bool {
+	return s.connDialed()
+}
+
+func (s *Session) Closed() bool {
+	c1 := atomic.LoadInt32(&s.closed) == 1          // 显示关闭会话
+	c2 := s.conf.AttemptDial == 0 && s.connClosed() // 或连接已关闭并且没有开启重连
+	return c1 || c2
 }
