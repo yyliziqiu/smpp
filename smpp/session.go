@@ -31,15 +31,16 @@ const (
 )
 
 type Session struct {
-	id     string         //
-	slog   *logrus.Logger //
-	store  *SessionStore  //
-	conn   Connection     //
-	conf   *SessionConfig //
-	term   *SessionTerm   //
-	status int32          // 连接状态
-	closed int32          // 会话是否被显示关闭
-	initAt time.Time      // 会话创建时间
+	id      string         //
+	slog    *logrus.Logger //
+	store   *SessionStore  //
+	conn    Connection     //
+	conf    *SessionConfig //
+	term    *SessionTerm   //
+	pending int32          // 正在发送的请求数量
+	status  int32          // 连接状态
+	closed  int32          // 会话是否被显示关闭
+	initAt  time.Time      // 会话创建时间
 }
 
 type SessionTerm struct {
@@ -137,8 +138,8 @@ func (s *Session) dial() error {
 	go s.loopSend()
 	go s.loopClear()
 
-	s.onDialed()
 	s.info("Dial succeed, peer addr: %s", s.PeerAddr())
+	s.onDialed()
 
 	return nil
 }
@@ -160,18 +161,30 @@ func (s *Session) close(reason string, desc string) {
 
 		// 等待读写协程停止
 		s.term.swg.Wait()
+		s.info("All goroutines done")
 
 		// 关闭链接
 		_ = s.conn.Close(reason == CloseByExplicit)
 
-		// 清理会话数据
+		// 清理通道
+		for atomic.LoadInt32(&s.pending) > 0 {
+			drain := true
+			for drain {
+				select {
+				case req := <-s.term.reqCh:
+					s.onRespond(NewResponse(req, nil, ErrChannelClosed))
+				default:
+					drain = false
+				}
+			}
+			s.info("Drained pdu and request channels")
+			time.Sleep(50 * time.Millisecond)
+		}
 		close(s.term.pduCh)
 		close(s.term.reqCh)
-		for request := range s.term.reqCh {
-			s.onRespond(NewResponse(request, nil, ErrChannelClosed))
-		}
-		s.term.window = nil
 
+		// 删除窗口
+		s.term.window = nil
 		s.info("Closed")
 
 		// 结束会话
@@ -555,9 +568,16 @@ func (s *Session) Write(p pdu.PDU, data any) error {
 		return ErrConnectionClosed
 	}
 
-	s.pushRequest(SubmitByUsr, p, data)
+	atomic.AddInt32(&s.pending, 1)
+	var err error
+	if s.connClosed() {
+		err = ErrConnectionClosed
+	} else {
+		s.pushRequest(SubmitByUsr, p, data)
+	}
+	atomic.AddInt32(&s.pending, -1)
 
-	return nil
+	return err
 }
 
 func (s *Session) Close() {
