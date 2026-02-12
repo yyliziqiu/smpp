@@ -10,38 +10,39 @@ import (
 
 type Window interface {
 	Full() bool
+	Data() map[int32]*Request
 	Put(*Request) error
 	Take(int32) *Request
 	TakeTimeout() []*Request
 }
 
-func CreateWindow(typ int, size int, wait time.Duration) Window {
-	switch typ {
+func CreateWindow(sess *Session) Window {
+	switch sess.conf.WindowType {
 	case 1:
-		return NewQueueWindow(size, wait)
+		return NewLargeWindow(sess.conf.WindowSize, sess.conf.WindowWait)
 	default:
-		return NewMapWindow(size, wait)
+		return NewSmallWindow(sess.conf.WindowSize, sess.conf.WindowWait)
 	}
 }
 
-// ============ MapWindow ============
+// ============ SmallWindow ============
 
-type MapWindow struct {
+type SmallWindow struct {
 	size int                // 窗口大小
 	wait int64              // 请求超时时间
 	data map[int32]*Request //
 	mu   sync.Mutex         //
 }
 
-func NewMapWindow(size int, wait time.Duration) Window {
-	return &MapWindow{
+func NewSmallWindow(size int, wait time.Duration) Window {
+	return &SmallWindow{
 		size: size,
 		wait: int64(wait.Seconds()),
 		data: make(map[int32]*Request, size),
 	}
 }
 
-func (w *MapWindow) Full() bool {
+func (w *SmallWindow) Full() bool {
 	w.mu.Lock()
 	full := w.full()
 	w.mu.Unlock()
@@ -49,11 +50,19 @@ func (w *MapWindow) Full() bool {
 	return full
 }
 
-func (w *MapWindow) full() bool {
+func (w *SmallWindow) full() bool {
 	return len(w.data) >= w.size
 }
 
-func (w *MapWindow) Put(request *Request) error {
+func (w *SmallWindow) Data() map[int32]*Request {
+	w.mu.Lock()
+	requests := maps.Clone(w.data)
+	w.mu.Unlock()
+
+	return requests
+}
+
+func (w *SmallWindow) Put(request *Request) error {
 	w.mu.Lock()
 	err := w.put(request)
 	w.mu.Unlock()
@@ -61,7 +70,7 @@ func (w *MapWindow) Put(request *Request) error {
 	return err
 }
 
-func (w *MapWindow) put(request *Request) error {
+func (w *SmallWindow) put(request *Request) error {
 	if w.full() {
 		return ErrWindowFull
 	}
@@ -71,7 +80,7 @@ func (w *MapWindow) put(request *Request) error {
 	return nil
 }
 
-func (w *MapWindow) Take(sequence int32) *Request {
+func (w *SmallWindow) Take(sequence int32) *Request {
 	w.mu.Lock()
 	request, ok := w.data[sequence]
 	if ok {
@@ -82,7 +91,7 @@ func (w *MapWindow) Take(sequence int32) *Request {
 	return request
 }
 
-func (w *MapWindow) TakeTimeout() []*Request {
+func (w *SmallWindow) TakeTimeout() []*Request {
 	requests := make([]*Request, 0, 8)
 
 	w.mu.Lock()
@@ -98,37 +107,30 @@ func (w *MapWindow) TakeTimeout() []*Request {
 	return requests
 }
 
-func (w *MapWindow) GetData() map[int32]*Request {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+// ============ LargeWindow ============
 
-	return maps.Clone(w.data)
-}
-
-// ============ QueueWindow ============
-
-type QueueWindow struct {
+type LargeWindow struct {
 	size  int
 	wait  int64
-	data  map[int32]*QueueWindowValue
+	data  map[int32]*LargeWindowValue
 	queue *xcq.Queue
 	mu    sync.Mutex
 }
 
-type QueueWindowValue struct {
+type LargeWindowValue struct {
 	Request *Request
 }
 
-func NewQueueWindow(size int, wait time.Duration) Window {
-	return &QueueWindow{
+func NewLargeWindow(size int, wait time.Duration) Window {
+	return &LargeWindow{
 		size:  size,
 		wait:  int64(wait.Seconds()),
-		data:  make(map[int32]*QueueWindowValue, size),
+		data:  make(map[int32]*LargeWindowValue, size),
 		queue: xcq.New(size * 2),
 	}
 }
 
-func (w *QueueWindow) Full() bool {
+func (w *LargeWindow) Full() bool {
 	w.mu.Lock()
 	full := w.full()
 	w.mu.Unlock()
@@ -136,11 +138,23 @@ func (w *QueueWindow) Full() bool {
 	return full
 }
 
-func (w *QueueWindow) full() bool {
+func (w *LargeWindow) full() bool {
 	return len(w.data) >= w.size
 }
 
-func (w *QueueWindow) Put(request *Request) error {
+func (w *LargeWindow) Data() map[int32]*Request {
+	requests := make(map[int32]*Request, len(w.data))
+
+	w.mu.Lock()
+	for key, value := range w.data {
+		requests[key] = value.Request
+	}
+	w.mu.Unlock()
+
+	return requests
+}
+
+func (w *LargeWindow) Put(request *Request) error {
 	w.mu.Lock()
 	err := w.put(request)
 	w.mu.Unlock()
@@ -148,12 +162,12 @@ func (w *QueueWindow) Put(request *Request) error {
 	return err
 }
 
-func (w *QueueWindow) put(request *Request) error {
+func (w *LargeWindow) put(request *Request) error {
 	if w.full() {
 		return ErrWindowFull
 	}
 
-	value := &QueueWindowValue{
+	value := &LargeWindowValue{
 		Request: request,
 	}
 
@@ -163,7 +177,7 @@ func (w *QueueWindow) put(request *Request) error {
 	return nil
 }
 
-func (w *QueueWindow) Take(sequence int32) *Request {
+func (w *LargeWindow) Take(sequence int32) *Request {
 	w.mu.Lock()
 	request := w.take(sequence)
 	w.mu.Unlock()
@@ -171,26 +185,27 @@ func (w *QueueWindow) Take(sequence int32) *Request {
 	return request
 }
 
-func (w *QueueWindow) take(sequence int32) *Request {
+func (w *LargeWindow) take(sequence int32) *Request {
 	value, ok := w.data[sequence]
 	if !ok {
 		return nil
 	}
 
 	delete(w.data, sequence)
+
 	request := value.Request
 	value.Request = nil
 
 	return request
 }
 
-func (w *QueueWindow) TakeTimeout() []*Request {
-	list := make([]*Request, 0, 16)
+func (w *LargeWindow) TakeTimeout() []*Request {
 	curr := time.Now().Unix()
+	list := make([]*Request, 0, 16)
 
 	w.mu.Lock()
 	w.queue.Pops2(func(item any) bool {
-		value := item.(*QueueWindowValue)
+		value := item.(*LargeWindowValue)
 		if value.Request == nil {
 			return true
 		}
@@ -204,11 +219,4 @@ func (w *QueueWindow) TakeTimeout() []*Request {
 	w.mu.Unlock()
 
 	return list
-}
-
-func (w *QueueWindow) GetData() map[int32]*QueueWindowValue {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	return maps.Clone(w.data)
 }

@@ -11,15 +11,15 @@ import (
 	"github.com/yyliziqiu/gdk/xtime"
 )
 
-func TestQueueWindow(t *testing.T) {
+func TestLargeWindow(t *testing.T) {
 	put := 7
 	size := 5
 	wait := 5 * time.Second
 
-	w := &QueueWindow{
+	w := &LargeWindow{
 		size:  size,
 		wait:  int64(wait.Seconds()),
-		data:  make(map[int32]*QueueWindowValue, size),
+		data:  make(map[int32]*LargeWindowValue, size),
 		queue: xcq.New(size * 2),
 	}
 
@@ -55,15 +55,15 @@ func TestQueueWindow(t *testing.T) {
 	select {}
 }
 
-func TestQueueWindow2(t *testing.T) {
+func TestLargeWindow2(t *testing.T) {
 	put := 1000000
 	size := 1000000
 	wait := 5 * time.Second
 
-	w := &QueueWindow{
+	w := &LargeWindow{
 		size:  size,
 		wait:  int64(wait.Seconds()),
-		data:  make(map[int32]*QueueWindowValue, size),
+		data:  make(map[int32]*LargeWindowValue, size),
 		queue: xcq.New(size * 2),
 	}
 

@@ -106,38 +106,35 @@ func (s *Session) dial() error {
 		return nil
 	}
 
-	err := s.conn.Dial()
-	if err != nil {
+	if err := s.conn.Dial(); err != nil {
 		s.warn("Dial failed, peer addr: %s, error: %v", s.PeerAddr(), err)
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var window Window
-	if s.conf.WindowNewer != nil {
-		window = s.conf.WindowNewer(s)
-	} else {
-		window = CreateWindow(s.conf.WindowType, s.conf.WindowSize, s.conf.WindowWait)
+	if s.conf.WindowNewer == nil {
+		s.conf.WindowNewer = CreateWindow
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	s.term = &SessionTerm{
 		swg:    sync.WaitGroup{},
 		ctx:    ctx,
 		cancel: cancel,
-		window: window,
+		window: s.conf.WindowNewer(s),
 		sendCh: make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
+	s.term.swg.Add(4)
 
-	s.term.swg.Add(3)
 	atomic.StoreInt32(&s.status, ConnectionDialed)
 
-	s.onDialed()
 	s.loopRead()
+	s.loopSend()
 	s.loopWrite()
 	s.loopClear()
 
+	s.onDialed()
 	s.info("Dial succeed, peer addr: %s", s.PeerAddr())
 
 	return nil
@@ -302,6 +299,10 @@ func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
 		SubmitAt:  0,
 		submitter: submitter,
 	}
+}
+
+func (s *Session) loopSend() {
+
 }
 
 func (s *Session) loopWrite() {
