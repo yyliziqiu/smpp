@@ -125,7 +125,7 @@ func (s *Session) dial() error {
 		ctx:    ctx,
 		cancel: cancel,
 		window: s.conf.WindowNewer(s),
-		pduCh:  make(chan pdu.PDU, 1),
+		pduCh:  make(chan pdu.PDU, 16),
 		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
@@ -293,7 +293,17 @@ func (s *Session) allowRead(_ pdu.PDU) bool {
 }
 
 func (s *Session) loopWrite() {
-	defer s.term.swg.Done()
+	defer func() {
+		drain := true // 把 pduCh 排空，防止 loopRead 阻塞
+		for drain {
+			select {
+			case <-s.term.pduCh:
+			default:
+				drain = false
+			}
+		}
+		s.term.swg.Done()
+	}()
 	for {
 		select {
 		case <-s.term.ctx.Done():
