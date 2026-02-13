@@ -125,7 +125,7 @@ func (s *Session) dial() error {
 		ctx:    ctx,
 		cancel: cancel,
 		window: s.conf.WindowNewer(s),
-		pduCh:  make(chan pdu.PDU, 16),
+		pduCh:  make(chan pdu.PDU, 16), // 必须带缓冲队列，防止 loopWrite 比 loopRead 先结束导致 loopRead 阻塞在 pduCh<- 处
 		reqCh:  make(chan *Request, 1),
 		dialAt: time.Now(),
 	}
