@@ -138,7 +138,7 @@ func (s *Session) dial() error {
 	go s.loopSend()
 	go s.loopClear()
 
-	s.info("Dial succeed, peer addr: %s", s.PeerAddr())
+	s.info("Dialed, peer addr: %s", s.PeerAddr())
 	s.onDialed()
 
 	return nil
@@ -161,7 +161,7 @@ func (s *Session) close(reason string, desc string) {
 
 		// 等待读写协程停止
 		s.term.swg.Wait()
-		s.info("All goroutines done")
+		s.debug("All goroutines done")
 
 		// 关闭链接
 		_ = s.conn.Close(reason == CloseByExplicit)
@@ -177,7 +177,7 @@ func (s *Session) close(reason string, desc string) {
 					drain = false
 				}
 			}
-			s.info("Drained pdu and request channels")
+			s.debug("Drained request channel")
 			time.Sleep(50 * time.Millisecond)
 		}
 		close(s.term.pduCh)
@@ -194,9 +194,8 @@ func (s *Session) close(reason string, desc string) {
 			return
 		}
 
-		s.info("Redialing")
-
 		// 重新启动会话
+		s.info("Redialing")
 		ticker := time.NewTicker(s.conf.AttemptDial)
 		defer ticker.Stop()
 		for {
@@ -302,6 +301,7 @@ func (s *Session) loopWrite() {
 				drain = false
 			}
 		}
+		s.debug("Drained pdu channel")
 		s.term.swg.Done()
 	}()
 	for {
