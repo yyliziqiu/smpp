@@ -80,10 +80,10 @@ func NewSession(conn Connection, cfg SessionConfig) (*Session, error) {
 		conf.WindowSize = 32
 	}
 	if conf.WindowWait == 0 {
-		conf.WindowWait = 30 * time.Second
+		conf.WindowWait = 10 * time.Second
 	}
 	if conf.WindowScan == 0 {
-		conf.WindowScan = 60 * time.Second
+		conf.WindowScan = 30 * time.Second
 	}
 
 	// 创建会话
