@@ -20,38 +20,38 @@ func NewResponse(req *Request, p pdu.PDU, err error) *Response {
 	}
 }
 
-func (resp *Response) TraceData() any {
-	return resp.Request.TraceData
+func (t *Response) TraceData() any {
+	return t.Request.TraceData
 }
 
-func (resp *Response) SessionId() string {
-	return resp.Request.SessionId
+func (t *Response) SessionId() string {
+	return t.Request.SessionId
 }
 
-func (resp *Response) SystemId() string {
-	return resp.Request.SystemId
+func (t *Response) SystemId() string {
+	return t.Request.SystemId
 }
 
-func (resp *Response) SubmitAt() int64 {
-	return resp.Request.SubmitAt
+func (t *Response) SubmitAt() int64 {
+	return t.Request.SubmitAt
 }
 
-func (resp *Response) ErrorString() string {
-	if resp.Error == nil {
+func (t *Response) ErrorString() string {
+	if t.Error == nil {
 		return ""
 	}
-	return resp.Error.Error()
+	return t.Error.Error()
 }
 
-func (resp *Response) TraceInt() int {
-	if i, ok := resp.Request.TraceData.(int); ok {
+func (t *Response) TraceInt() int {
+	if i, ok := t.Request.TraceData.(int); ok {
 		return i
 	}
 	return 0
 }
 
-func (resp *Response) TraceString() string {
-	if s, ok := resp.Request.TraceData.(string); ok {
+func (t *Response) TraceString() string {
+	if s, ok := t.Request.TraceData.(string); ok {
 		return s
 	}
 	return ""

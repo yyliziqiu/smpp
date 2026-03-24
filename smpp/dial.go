@@ -31,8 +31,7 @@ func TlsDial(domain string, timeout time.Duration) Dial {
 			ServerName:         domain,
 		})
 
-		err = cli.Handshake()
-		if err != nil {
+		if err = cli.Handshake(); err != nil {
 			_ = conn.Close()
 			return nil, err
 		}

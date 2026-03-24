@@ -100,8 +100,7 @@ func NewSession(conn Connection, cfg SessionConfig) (*Session, error) {
 	}
 
 	// 建立链接
-	err := s.dial()
-	if err != nil {
+	if err := s.dial(); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +118,6 @@ func (s *Session) dial() error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	s.term = &SessionTerm{
 		swg:    sync.WaitGroup{},
 		ctx:    ctx,
@@ -406,8 +404,7 @@ func (s *Session) send(request *Request) bool {
 			}
 		}
 		// 将请求添加至窗口
-		err := s.term.window.Put(request)
-		if err != nil {
+		if err := s.term.window.Put(request); err != nil {
 			s.warn("Put request to window failed, error: %v", err)
 			s.onRespond(NewResponse(request, nil, err))
 			return false

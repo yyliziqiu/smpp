@@ -30,7 +30,6 @@ func ConnectionRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
 			return nil, err
 		}
 	}
-
 	return pdu.Parse(conn)
 }
 
@@ -105,14 +104,13 @@ func (c *ClientConnection) BindType() pdu.BindingType {
 	return c.conf.BindType
 }
 
-func (c *ClientConnection) Dial() error {
+func (c *ClientConnection) Dial() (err error) {
 	// 关闭旧链接
 	if c.conn != nil {
 		_ = c.conn.Close()
 	}
 
 	// 连接
-	var err error
 	c.conn, err = c.conf.Dial(c.conf.Smsc)
 	if err != nil {
 		return err
@@ -122,8 +120,7 @@ func (c *ClientConnection) Dial() error {
 	c.selfAddr, c.peerAddr = ConnectionAddrs(c.conn)
 
 	// 绑定账号
-	err = c.bind()
-	if err != nil {
+	if err = c.bind(); err != nil {
 		_ = c.conn.Close()
 		return err
 	}
