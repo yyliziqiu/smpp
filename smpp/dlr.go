@@ -43,17 +43,29 @@ type Dlr struct {
 	Text  string    // 错误信息
 }
 
-func (r *Dlr) String() string {
-	return fmt.Sprintf(dlrFormat, r.Id, r.Sub, r.Dlvrd, r.Sd.Format(dlrDateFormat1), r.Dd.Format(dlrDateFormat1), r.Stat, r.Err, r.Text)
-}
-
-func (r *Dlr) Pdu(source string, dest string) *pdu.DeliverSM {
+func (t *Dlr) ToPdu(source string, dest string, message pdu.ShortMessage) *pdu.DeliverSM {
 	p := pdu.NewDeliverSM().(*pdu.DeliverSM)
 	p.SourceAddr = Address(1, 1, source)
 	p.DestAddr = Address(5, 0, dest)
 	p.EsmClass = data.SM_SMSC_DLV_RCPT_TYPE
-	p.Message = BinaryMessage([]byte(r.String()))
+	p.Message = message
 	return p
+}
+
+func (t *Dlr) String() string {
+	return fmt.Sprintf(dlrFormat, t.Id, t.Sub, t.Dlvrd, t.Sd.Format(dlrDateFormat1), t.Dd.Format(dlrDateFormat1), t.Stat, t.Err, t.Text)
+}
+
+func (t *Dlr) Pdu(source string, dest string) *pdu.DeliverSM {
+	return t.ToPdu(source, dest, BinaryMessage([]byte(t.String())))
+}
+
+func (t *Dlr) PduGsm7bit(source string, dest string) *pdu.DeliverSM {
+	return t.ToPdu(source, dest, Gsm7bitMessage(t.String()))
+}
+
+func (t *Dlr) PduUcs2(source string, dest string) *pdu.DeliverSM {
+	return t.ToPdu(source, dest, Ucs2Message(t.String()))
 }
 
 func ParseDlr(s string) (Dlr, error) {
@@ -112,17 +124,17 @@ func BuildDlr(id string, sub int, dlvrd int, stat string, err int) Dlr {
 	curr := time.Now()
 	return Dlr{
 		Id:    id,
-		Sub:   buildDlrNum(sub),
-		Dlvrd: buildDlrNum(dlvrd),
+		Sub:   DlrNumber(sub),
+		Dlvrd: DlrNumber(dlvrd),
 		Sd:    curr,
 		Dd:    curr,
 		Stat:  stat,
-		Err:   buildDlrNum(err),
+		Err:   DlrNumber(err),
 		Text:  stat,
 	}
 }
 
-func buildDlrNum(n int) string {
+func DlrNumber(n int) string {
 	if n < 0 || n > 999 {
 		return "999"
 	}
