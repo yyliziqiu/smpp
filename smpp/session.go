@@ -511,19 +511,19 @@ func (s *Session) connClosed() bool {
 
 func (s *Session) debug(m string, a ...any) {
 	if s.slog != nil {
-		s.slog.Debugf(s.formatLog(m, a...))
+		s.slog.Debug(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) info(m string, a ...any) {
 	if s.slog != nil {
-		s.slog.Infof(s.formatLog(m, a...))
+		s.slog.Info(s.formatLog(m, a...))
 	}
 }
 
 func (s *Session) warn(m string, a ...any) {
 	if s.slog != nil {
-		s.slog.Warnf(s.formatLog(m, a...))
+		s.slog.Warn(s.formatLog(m, a...))
 	}
 }
 

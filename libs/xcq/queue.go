@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	ErrEmptyQueue      = errors.New("empty queue")
-	ErrIndexOutOfRange = errors.New("index out of range")
+	ErrEmptyQueue = errors.New("empty queue")
+	ErrOutOfRange = errors.New("index out of range")
 )
 
 type Queue struct {
@@ -151,7 +151,7 @@ func (q *Queue) get(i int) (any, error) {
 		return nil, ErrEmptyQueue
 	}
 	if !q.valid(i) {
-		return nil, ErrIndexOutOfRange
+		return nil, ErrOutOfRange
 	}
 	return q.list[i], nil
 }
