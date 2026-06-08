@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/gdk/xcq"
-	"github.com/yyliziqiu/gdk/xtime"
+
+	"github.com/yyliziqiu/smpp/libs/xcq"
+	"github.com/yyliziqiu/smpp/libs/xtimer"
 )
 
 func TestLargeWindow(t *testing.T) {
@@ -98,10 +99,10 @@ func TestLargeWindow2(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				timer := xtime.NewTimer()
+				timer := xtimer.New()
 				requests := w.TakeTimeout() // 遍历1000000耗时65ms
 				if len(requests) > 0 {
-					fmt.Printf("[stat] take: %d, cost: %s, map: %d, queue: %s\n", len(requests), timer.Stops(), len(w.data), w.queue.Status())
+					fmt.Printf("[stat] take: %d, cost: %s, map: %d, queue: %s\n", len(requests), timer.Stop(), len(w.data), w.queue.Status())
 				}
 			}
 		}

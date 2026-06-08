@@ -8,8 +8,8 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/gdk/xuid"
 
+	"github.com/yyliziqiu/smpp/libs/xuid"
 	"github.com/yyliziqiu/smpp/smpp"
 )
 

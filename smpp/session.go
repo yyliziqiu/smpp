@@ -11,7 +11,8 @@ import (
 
 	"github.com/linxGnu/gosmpp/pdu"
 	"github.com/sirupsen/logrus"
-	"github.com/yyliziqiu/gdk/xuid"
+
+	"github.com/yyliziqiu/smpp/libs/xuid"
 )
 
 const (

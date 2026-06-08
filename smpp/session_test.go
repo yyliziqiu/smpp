@@ -9,8 +9,9 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/gdk/xlog"
-	"github.com/yyliziqiu/gdk/xuid"
+	"github.com/sirupsen/logrus"
+
+	"github.com/yyliziqiu/smpp/libs/xuid"
 )
 
 func TestMain(m *testing.M) {
@@ -20,8 +21,7 @@ func TestMain(m *testing.M) {
 }
 
 func prepare() {
-	_ = xlog.Init(xlog.Config{Console: true})
-	SetLog(xlog.New3("smpp"))
+	SetLog(logrus.New())
 }
 
 func finally(code int) {

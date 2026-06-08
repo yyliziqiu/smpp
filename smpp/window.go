@@ -4,8 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yyliziqiu/gdk/xcq"
 	"golang.org/x/exp/maps"
+
+	"github.com/yyliziqiu/smpp/libs/xcq"
 )
 
 type Window interface {

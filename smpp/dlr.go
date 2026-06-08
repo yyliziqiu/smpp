@@ -9,7 +9,8 @@ import (
 
 	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/gdk/xconv"
+
+	"github.com/yyliziqiu/smpp/libs/xconv"
 )
 
 const (

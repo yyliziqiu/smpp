@@ -2,17 +2,16 @@ package example
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/yyliziqiu/gdk/xlog"
-	"github.com/yyliziqiu/gdk/xtime"
-	"github.com/yyliziqiu/gdk/xuid"
+	"github.com/sirupsen/logrus"
 
+	"github.com/yyliziqiu/smpp/libs/xtimer"
+	"github.com/yyliziqiu/smpp/libs/xuid"
 	"github.com/yyliziqiu/smpp/smpp"
 )
 
@@ -23,8 +22,7 @@ func TestMain(m *testing.M) {
 }
 
 func prepare() {
-	_ = xlog.Init(xlog.Config{Path: "/private/ws/self/smpp"})
-	smpp.SetLog(xlog.New3("assist"))
+	smpp.SetLog(logrus.New())
 }
 
 func finally(code int) {
@@ -71,10 +69,10 @@ func TestDlrTracer(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				timer := xtime.NewTimer()
+				timer := xtimer.New()
 				tos := w.TakeTimeout() // 遍历1000000耗时150ms
 				if len(tos) > 0 {
-					fmt.Printf("[stat] take: %d, cost: %s, map: %d, heap: %d\n", len(tos), timer.Stops(), len(w.data), w.heap.Len())
+					fmt.Printf("[stat] take: %d, cost: %s, map: %d, heap: %d\n", len(tos), timer.Stop(), len(w.data), w.heap.Len())
 				}
 			}
 		}
@@ -88,34 +86,4 @@ func TestDlrTracer(t *testing.T) {
 	w = nil
 
 	smpp.PrintMemory("clear all", true)
-}
-
-func TestNewDlrTracer2(t *testing.T) {
-	w := NewDlrTracer2(10, "/private/ws/self/smpp/data")
-
-	for i := 0; i < 3; i++ {
-		w.Put(&DlrNode{
-			MessageId: xuid.Get(),
-			SystemId:  "user1",
-			ExpireAt:  time.Now().Unix() + int64(i),
-		})
-	}
-
-	err := w.Save(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w = NewDlrTracer2(10, "/private/ws/self/smpp/data")
-
-	err = w.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bs, _ := json.MarshalIndent(w.data, "", "  ")
-	fmt.Println(string(bs))
-	fmt.Println("*****************************")
-	bs, _ = json.MarshalIndent(w.heap, "", "  ")
-	fmt.Println(string(bs))
 }
