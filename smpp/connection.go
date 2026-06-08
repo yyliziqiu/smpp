@@ -20,46 +20,8 @@ type Connection interface {
 	Close(bool) error
 }
 
-func ConnectionAddrs(conn net.Conn) (string, string) {
-	return conn.LocalAddr().String(), conn.RemoteAddr().String()
-}
-
-func ConnectionRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
-	if timeout > 0 {
-		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return nil, err
-		}
-	}
-	return pdu.Parse(conn)
-}
-
-func ConnectionWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
-	buf := pdu.NewBuffer(make([]byte, 0, 32))
-	pd.Marshal(buf)
-
-	if timeout > 0 {
-		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-			return 0, err
-		}
-	}
-
-	return conn.Write(buf.Bytes())
-}
-
-func ConnectionClose(conn net.Conn, bye bool) error {
-	if bye {
-		// 主动断开链接时，发送解绑请求
-		_, _ = ConnectionWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
-		// 防止对端响应 unbind-resp 时 reset。不读取 unbind-resp，直接关闭链接
-		time.Sleep(100 * time.Millisecond)
-	}
-	return conn.Close()
-}
-
-// ============ Client ============
-
 type ClientConnection struct {
-	conf     *ClientConnectionConfig
+	conf     ClientConnectionConfig
 	conn     net.Conn
 	selfAddr string
 	peerAddr string
@@ -81,7 +43,7 @@ func NewClientConnection(conf ClientConnectionConfig) *ClientConnection {
 	if conf.Dial == nil {
 		conf.Dial = DefaultDial
 	}
-	return &ClientConnection{conf: &conf}
+	return &ClientConnection{conf: conf}
 }
 
 func (c *ClientConnection) SelfAddr() string {
@@ -117,7 +79,7 @@ func (c *ClientConnection) Dial() (err error) {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnectionAddrs(c.conn)
+	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
 
 	// 绑定账号
 	if err = c.bind(); err != nil {
@@ -174,21 +136,19 @@ func (c *ClientConnection) bind() error {
 }
 
 func (c *ClientConnection) Read() (pdu.PDU, error) {
-	return ConnectionRead(c.conn, c.conf.ReadTimeout)
+	return ConnRead(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ClientConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnectionWrite(c.conn, pd, c.conf.WriteTimeout)
+	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ClientConnection) Close(bye bool) error {
-	return ConnectionClose(c.conn, bye)
+	return ConnClose(c.conn, bye)
 }
 
-// ============ Server ============
-
 type ServerConnection struct {
-	conf     *ServerConnectionConfig
+	conf     ServerConnectionConfig
 	conn     net.Conn
 	systemId string
 	bindType pdu.BindingType
@@ -205,7 +165,7 @@ type ServerConnectionConfig struct {
 type ServerConnectionAuthenticate func(conn *ServerConnection, systemId string, password string) data.CommandStatusType
 
 func NewServerConnection(conn net.Conn, conf ServerConnectionConfig) *ServerConnection {
-	return &ServerConnection{conn: conn, conf: &conf}
+	return &ServerConnection{conn: conn, conf: conf}
 }
 
 func (c *ServerConnection) SelfAddr() string {
@@ -243,7 +203,7 @@ func (c *ServerConnection) dial() error {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnectionAddrs(c.conn)
+	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
 
 	// 获取绑定请求
 	var (
@@ -287,13 +247,13 @@ func (c *ServerConnection) dial() error {
 }
 
 func (c *ServerConnection) Read() (pdu.PDU, error) {
-	return ConnectionRead(c.conn, c.conf.ReadTimeout)
+	return ConnRead(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ServerConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnectionWrite(c.conn, pd, c.conf.WriteTimeout)
+	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ServerConnection) Close(bye bool) error {
-	return ConnectionClose(c.conn, bye)
+	return ConnClose(c.conn, bye)
 }

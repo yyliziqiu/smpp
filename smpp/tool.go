@@ -3,6 +3,7 @@ package smpp
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"runtime"
 	"strings"
 	"time"
@@ -19,6 +20,44 @@ var _slog *logrus.Logger
 
 func SetLog(slog *logrus.Logger) {
 	_slog = slog
+}
+
+// ============ Connection ============
+
+func ConnAddrs(conn net.Conn) (string, string) {
+	return conn.LocalAddr().String(), conn.RemoteAddr().String()
+}
+
+func ConnRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
+	if timeout > 0 {
+		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+	}
+	return pdu.Parse(conn)
+}
+
+func ConnWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
+	buf := pdu.NewBuffer(make([]byte, 0, 32))
+	pd.Marshal(buf)
+
+	if timeout > 0 {
+		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+			return 0, err
+		}
+	}
+
+	return conn.Write(buf.Bytes())
+}
+
+func ConnClose(conn net.Conn, bye bool) error {
+	if bye {
+		// 主动断开链接时，发送解绑请求
+		_, _ = ConnWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
+		// 防止对端响应 unbind-resp 时 reset。不读取 unbind-resp，直接关闭链接
+		time.Sleep(100 * time.Millisecond)
+	}
+	return conn.Close()
 }
 
 // ============ Session ============
