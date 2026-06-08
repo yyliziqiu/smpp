@@ -46,6 +46,13 @@ func (t *SessionStore) AddSession(sess *Session) {
 	t.mu.Unlock()
 }
 
+func (t *SessionStore) DeleteSession(id string) {
+	t.mu.Lock()
+	delete(t.ts, id)
+	t.mu.Unlock()
+}
+
+// DelSession deprecated
 func (t *SessionStore) DelSession(id string) {
 	t.mu.Lock()
 	delete(t.ts, id)
