@@ -10,13 +10,12 @@ A clean and production-ready **SMPP 3.4** library for Go, built on top of [gosmp
 ## Features
 
 - **SMPP 3.4** protocol — full PDU support
-- **Client & Server** — both sides in a unified session model
+- **Client & Server** — both sides share a unified session model
 - **Auto-reconnect** — configurable redial interval, transparent to callers
 - **Flow-control window** — two implementations tuned for different throughput profiles
-- **Delivery receipts** — parse, build, and encode DLR payloads
+- **Delivery receipts** — parse, build, and encode receipt payloads
 - **Message helpers** — auto-detect encoding, GSM-7bit, UCS-2, Binary
 - **Heartbeat** — built-in EnquireLink loop
-- **TLS** — optional TLS dial
 
 ---
 
@@ -88,7 +87,6 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 }
-
 ```
 
 ### Server
@@ -164,6 +162,7 @@ func handleConn(conn net.Conn) {
 | `WindowWait`  | `time.Duration`                       | Request timeout (default 10s)                                                |
 | `WindowScan`  | `time.Duration`                       | Interval to sweep timed-out requests (default 30s)                           |
 | `WindowBlock` | `time.Duration`                       | Block behavior when window is full: `0` return error, `>0` sleep, `<0` yield |
+| `WindowNewer` | `func(*Session) Window`               | Custom window factory                                                        |
 | `OnDialed`    | `func(*Session)`                      | Called after each successful (re)connect                                     |
 | `OnClosed`    | `func(*Session, reason, desc string)` | Called when the session is fully closed                                      |
 | `OnReceive`   | `func(*Session, PDU) PDU`             | Called for every inbound non-response PDU; return a PDU to reply             |
@@ -181,11 +180,11 @@ The window controls how many requests can be in-flight at the same time.
 | `SmallWindow` (default) | Low concurrency, small window sizes                 |
 | `LargeWindow`           | High throughput, large window sizes, short timeouts |
 
-Switch via `SessionConfig.WindowType = 1` or provide a custom factory through `WindowNewer`.
+Switch via `SessionConfig.WindowType = 1`, or provide a custom factory via `WindowNewer`.
 
 ---
 
-## Delivery Receipts (DLR)
+## Delivery Receipts
 
 ```go
 package main
@@ -197,25 +196,25 @@ import (
 )
 
 func main() {
-	// Build a DLR
-	dlr := smpp.BuildDlr("msg-001", 1, 1, smpp.DlrStatDelivered, 0)
-	fmt.Println(dlr.String())
+	// Build a receipt
+	r := smpp.BuildReceipt("msg-001", 1, 1, smpp.ReceiptStatDelivered, 0)
+	fmt.Println(r.String())
 
-	// Parse a DLR string
-	parsed, err := smpp.ParseDlr(dlr.String())
+	// Parse a receipt string
+	parsed, err := smpp.ParseReceipt(r.String())
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("id=%s stat=%s\n", parsed.Id, parsed.Stat)
 
-	// Encode into a DeliverSM PDU (to write over a session)
-	_ = dlr.Pdu("6281339900520", "MyBrand")        // binary (default)
-	_ = dlr.PduGsm7bit("6281339900520", "MyBrand") // GSM-7bit
-	_ = dlr.PduUcs2("6281339900520", "MyBrand")    // UCS-2
+	// Encode into a DeliverSM PDU
+	_ = r.Pdu("6281339900520", "MyBrand")        // binary (default)
+	_ = r.PduGsm7bit("6281339900520", "MyBrand") // GSM-7bit
+	_ = r.PduUcs2("6281339900520", "MyBrand")    // UCS-2
 }
 ```
 
-DLR status constants: `DlrStatDelivered`, `DlrStatUndeliverable`, `DlrStatExpired`, `DlrStatRejected`, and more.
+Receipt status constants: `ReceiptStatDelivered`, `ReceiptStatUndeliverable`, `ReceiptStatExpired`, `ReceiptStatRejected`, `ReceiptStatEnRoute`, `ReceiptStatAccepted`, `ReceiptStatDeleted`, `ReceiptStatUnknown`.
 
 ---
 
@@ -246,48 +245,13 @@ func main() {
 ## TLS
 
 ```go
-package main
-
-import (
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/linxGnu/gosmpp/pdu"
-	"github.com/yyliziqiu/smpp/smpp"
-)
-
-func main() {
-	conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
-		Dial:     smpp.DefaultTlsDial,
-		Smsc:     "smsc.example.com:10035",
-		SystemId: "user1",
-		Password: "user1",
-		BindType: pdu.Transceiver,
-	})
-
-	sess, err := smpp.NewSession(conn, smpp.SessionConfig{
-		EnquireLink: 15 * time.Second,
-		OnReceive: func(sess *smpp.Session, p pdu.PDU) pdu.PDU {
-			if p.CanResponse() {
-				return p.GetResponse()
-			}
-			return nil
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer sess.Close()
-
-	fmt.Println("connected via TLS, session id:", sess.Id())
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-}
+conn := smpp.NewClientConnection(smpp.ClientConnectionConfig{
+Dial:     smpp.DefaultTlsDial,
+Smsc:     "smsc.example.com:10035",
+SystemId: "user1",
+Password: "user1",
+BindType: pdu.Transceiver,
+})
 ```
 
 ---
@@ -297,24 +261,26 @@ func main() {
 Every active session is automatically registered in a global store.
 
 ```go
-package main
+sess := smpp.GetSession("session-id")
 
-import (
-	"fmt"
+all := smpp.GetSessions()
+fmt.Println("active sessions:", len(all))
 
-	"github.com/yyliziqiu/smpp/smpp"
-)
+fmt.Println("session count:", smpp.CountSessions())
+```
 
-func main() {
-	// These are available after sessions are created elsewhere in your program.
-	sess := smpp.GetSession("session-id")
-	fmt.Println(sess)
+---
 
-	all := smpp.GetSessions()
-	fmt.Println("active sessions:", len(all))
+## Logging
 
-	fmt.Println("session count:", smpp.CountSessions())
-}
+Pass a [logrus](https://github.com/sirupsen/logrus) logger to enable structured logging:
+
+```go
+import "github.com/sirupsen/logrus"
+
+logger := logrus.New()
+logger.SetLevel(logrus.DebugLevel)
+smpp.SetLog(logger)
 ```
 
 ---
