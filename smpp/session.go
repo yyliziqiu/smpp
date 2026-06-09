@@ -171,7 +171,7 @@ func (s *Session) close(reason string, desc string) {
 			for drain {
 				select {
 				case req := <-s.term.reqCh:
-					s.onRespond(NewResponse(req, nil, ErrChannelClosed))
+					s.onRespond(NewResponse(req, nil, ErrConnectionClosed))
 				default:
 					drain = false
 				}

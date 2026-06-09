@@ -1,11 +1,5 @@
 package xcq
 
-// EnableDebug 开启 debug 模式，该模式下会输出队列的操作日志
-func (q *Queue) EnableDebug() *Queue {
-	q.debug = true
-	return q
-}
-
 // Get 获取指定下标的元素
 func (q *Queue) Get(i int) (any, error) {
 	return q.get(i)
@@ -100,10 +94,6 @@ func (q *Queue) Slide(item any, rmf Remove) (rmd []any) {
 		}
 	}
 
-	if len(rmd) > 0 && q.debug {
-		q.print("slide")
-	}
-
 	return rmd
 }
 
@@ -117,10 +107,6 @@ func (q *Queue) SlideN(item any, n int) (rmd []any) {
 		if rm, ok := q.pop(); ok {
 			rmd = append(rmd, rm)
 		}
-	}
-
-	if len(rmd) > 0 && q.debug {
-		q.print("slide")
 	}
 
 	return rmd

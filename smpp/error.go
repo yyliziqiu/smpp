@@ -13,7 +13,6 @@ var (
 	ErrWindowFull       = errors.New("window full")
 	ErrNotAllowed       = errors.New("not allowed")
 	ErrConnectionClosed = errors.New("connection closed")
-	ErrChannelClosed    = errors.New("channel closed")
 	ErrResponseTimeout  = errors.New("response timeout")
 	ErrConnectionIsNil  = errors.New("connection is nil")
 )

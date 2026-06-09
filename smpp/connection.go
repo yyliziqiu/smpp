@@ -79,7 +79,7 @@ func (c *ClientConnection) Dial() (err error) {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
+	c.selfAddr, c.peerAddr = GetConnAddrs(c.conn)
 
 	// 绑定账号
 	if err = c.bind(); err != nil {
@@ -136,15 +136,15 @@ func (c *ClientConnection) bind() error {
 }
 
 func (c *ClientConnection) Read() (pdu.PDU, error) {
-	return ConnRead(c.conn, c.conf.ReadTimeout)
+	return ReadConn(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ClientConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
+	return WriteConn(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ClientConnection) Close(bye bool) error {
-	return ConnClose(c.conn, bye)
+	return CloseConn(c.conn, bye)
 }
 
 type ServerConnection struct {
@@ -203,7 +203,7 @@ func (c *ServerConnection) dial() error {
 	}
 
 	// 获取两端地址
-	c.selfAddr, c.peerAddr = ConnAddrs(c.conn)
+	c.selfAddr, c.peerAddr = GetConnAddrs(c.conn)
 
 	// 获取绑定请求
 	var (
@@ -247,13 +247,13 @@ func (c *ServerConnection) dial() error {
 }
 
 func (c *ServerConnection) Read() (pdu.PDU, error) {
-	return ConnRead(c.conn, c.conf.ReadTimeout)
+	return ReadConn(c.conn, c.conf.ReadTimeout)
 }
 
 func (c *ServerConnection) Write(pd pdu.PDU) (int, error) {
-	return ConnWrite(c.conn, pd, c.conf.WriteTimeout)
+	return WriteConn(c.conn, pd, c.conf.WriteTimeout)
 }
 
 func (c *ServerConnection) Close(bye bool) error {
-	return ConnClose(c.conn, bye)
+	return CloseConn(c.conn, bye)
 }

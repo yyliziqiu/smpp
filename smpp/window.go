@@ -26,8 +26,6 @@ func CreateWindow(sess *Session) Window {
 	}
 }
 
-// ============ SmallWindow ============
-
 type SmallWindow struct {
 	size int                // 窗口大小
 	wait int64              // 请求超时时间
@@ -107,8 +105,6 @@ func (w *SmallWindow) TakeTimeout() []*Request {
 
 	return requests
 }
-
-// ============ LargeWindow ============
 
 type LargeWindow struct {
 	size  int

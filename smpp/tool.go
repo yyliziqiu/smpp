@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ============ Logger ============
+// ======================== Log ========================
 
 var _slog *logrus.Logger
 
@@ -22,45 +21,7 @@ func SetLog(slog *logrus.Logger) {
 	_slog = slog
 }
 
-// ============ Connection ============
-
-func ConnAddrs(conn net.Conn) (string, string) {
-	return conn.LocalAddr().String(), conn.RemoteAddr().String()
-}
-
-func ConnRead(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
-	if timeout > 0 {
-		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return nil, err
-		}
-	}
-	return pdu.Parse(conn)
-}
-
-func ConnWrite(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
-	buf := pdu.NewBuffer(make([]byte, 0, 32))
-	pd.Marshal(buf)
-
-	if timeout > 0 {
-		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-			return 0, err
-		}
-	}
-
-	return conn.Write(buf.Bytes())
-}
-
-func ConnClose(conn net.Conn, bye bool) error {
-	if bye {
-		// 主动断开链接时，发送解绑请求
-		_, _ = ConnWrite(conn, pdu.NewUnbind(), 100*time.Millisecond)
-		// 防止对端响应 unbind-resp 时 reset。不读取 unbind-resp，直接关闭链接
-		time.Sleep(100 * time.Millisecond)
-	}
-	return conn.Close()
-}
-
-// ============ Session ============
+// ======================== Session ========================
 
 var _store = NewSessionStore()
 
@@ -76,7 +37,45 @@ func CountSessions() int {
 	return _store.CountSessions()
 }
 
-// ============ Message ============
+// ======================== Connection ========================
+
+func GetConnAddrs(conn net.Conn) (string, string) {
+	return conn.LocalAddr().String(), conn.RemoteAddr().String()
+}
+
+func ReadConn(conn net.Conn, timeout time.Duration) (pdu.PDU, error) {
+	if timeout > 0 {
+		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+	}
+	return pdu.Parse(conn)
+}
+
+func WriteConn(conn net.Conn, pd pdu.PDU, timeout time.Duration) (int, error) {
+	buf := pdu.NewBuffer(make([]byte, 0, 32))
+	pd.Marshal(buf)
+
+	if timeout > 0 {
+		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+			return 0, err
+		}
+	}
+
+	return conn.Write(buf.Bytes())
+}
+
+func CloseConn(conn net.Conn, bye bool) error {
+	if bye {
+		// 主动断开链接时，发送解绑请求
+		_, _ = WriteConn(conn, pdu.NewUnbind(), 100*time.Millisecond)
+		// 防止对端响应 unbind-resp 时 reset。不读取 unbind-resp，直接关闭链接
+		time.Sleep(100 * time.Millisecond)
+	}
+	return conn.Close()
+}
+
+// ======================== Message ========================
 
 // Address
 // TON (Type of Number)
@@ -131,7 +130,7 @@ func BinaryMessage(s []byte) pdu.ShortMessage {
 	return sm
 }
 
-// ============ Debug ============
+// ======================== Other ========================
 
 func PrintPdu(tag string, systemId string, p pdu.PDU) {
 	if p != nil {
@@ -139,25 +138,6 @@ func PrintPdu(tag string, systemId string, p pdu.PDU) {
 		fmt.Printf("[%s:%s:%T] %s\n\n", tag, systemId, p, string(bs))
 	}
 }
-
-func PrintMemory(tag string, gc bool) {
-	if gc {
-		runtime.GC()
-		time.Sleep(50 * time.Millisecond)
-	}
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	fmt.Printf("[memory:%s] alloc: %d KB\n", tag, memStats.Alloc/1024)
-}
-
-// ============ Other ============
-
-const (
-	Gsm7bitBasicChars = " .,:;!?'()+-*/_%&#<=>@£$¥\"\n\r\fØøÅåΔΦΓΛΩΠΨΣΘΞÆæßÉ¤ÄÖÑÜ§¿äöñüàèéùìòÇ" // 62 + 65 = 127
-	Gsm7bitExtraChars = "[]{}^~|€\\"                                                            // 9
-)
 
 func DetectMessage(s string) (int, int, bool) {
 	isGsm := true
@@ -196,6 +176,8 @@ func DetectMessage(s string) (int, int, bool) {
 	return msgLen, slices, isGsm
 }
 
+const Gsm7bitBasicChars = " .,:;!?'()+-*/_%&#<=>@£$¥\"\n\r\fØøÅåΔΦΓΛΩΠΨΣΘΞÆæßÉ¤ÄÖÑÜ§¿äöñüàèéùìòÇ" // 62 + 65 = 127个
+
 func IsGsm7bitBasicChar(r rune) bool {
 	if r >= 'a' && r <= 'z' {
 		return true
@@ -208,6 +190,8 @@ func IsGsm7bitBasicChar(r rune) bool {
 	}
 	return strings.ContainsRune(Gsm7bitBasicChars, r)
 }
+
+const Gsm7bitExtraChars = "[]{}^~|€\\" // 9个
 
 func IsGsm7bitExtraChar(r rune) bool {
 	return strings.ContainsRune(Gsm7bitExtraChars, r)

@@ -11,22 +11,15 @@ var (
 )
 
 type Queue struct {
-	step  int
-	path  string
-	list  []any
-	head  int
-	tail  int
-	debug bool
+	step int
+	list []any
+	head int
+	tail int
 }
 
 func New(n int) *Queue {
-	return New2(n, "")
-}
-
-func New2(n int, path string) *Queue {
 	return &Queue{
 		step: n,
-		path: path,
 		list: make([]any, n+1),
 	}
 }
@@ -87,17 +80,6 @@ func (q *Queue) push(item any) {
 	// 添加元素
 	q.list[q.tail] = item
 	q.tail = q.tailnext()
-
-	// 打印 debug 信息
-	if q.debug {
-		q.print(fmt.Sprintf("push %+v", item))
-	}
-}
-
-func (q *Queue) print(tag string) {
-	if q.debug {
-		fmt.Printf("[%s] %s\n", q.status(), tag)
-	}
 }
 
 func (q *Queue) status() string {
@@ -115,10 +97,6 @@ func (q *Queue) grow() {
 	q.list = dst
 	q.head = 0
 	q.tail = j
-
-	if q.debug {
-		q.print("grow")
-	}
 }
 
 // 从队列头弹出一个元素
@@ -132,11 +110,6 @@ func (q *Queue) pop() (any, bool) {
 	item := q.list[q.head]
 	q.list[q.head] = nil
 	q.head = q.headnext()
-
-	// 打印 debug 信息
-	if q.debug {
-		q.print(fmt.Sprintf("pop  %+v", item))
-	}
 
 	return item, true
 }
