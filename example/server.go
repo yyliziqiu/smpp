@@ -80,7 +80,7 @@ func accept(conn net.Conn) {
 }
 
 func deliverSmPdu() *pdu.DeliverSM {
-	dlr := smpp.Dlr{
+	dlr := smpp.Receipt{
 		Id:    xuid.Get(),
 		Sub:   "001",
 		Dlvrd: "001",
