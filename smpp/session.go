@@ -325,11 +325,10 @@ func (s *Session) write(p pdu.PDU) bool {
 		if n > 0 {
 			s.close(CloseByError, err.Error())
 			return true
-		} else {
-			if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
-				s.close(CloseByError, err.Error())
-				return true
-			}
+		}
+		if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
+			s.close(CloseByError, err.Error())
+			return true
 		}
 	}
 
@@ -457,7 +456,7 @@ func (s *Session) onDialed() {
 }
 
 func (s *Session) onClosed(reason string, desc string) {
-	s.store.DelSession(s.id)
+	s.store.DeleteSession(s.id)
 	if s.conf.OnClosed != nil {
 		s.conf.OnClosed(s, reason, desc)
 	}
