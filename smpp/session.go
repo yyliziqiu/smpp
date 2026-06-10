@@ -530,46 +530,59 @@ func (s *Session) formatLog(m string, a ...any) string {
 	return fmt.Sprintf("[Session@%s:%s] ", s.Id(), s.SystemId()) + fmt.Sprintf(m, a...)
 }
 
+// Id get this session ID
 func (s *Session) Id() string {
 	return s.id
 }
 
+// SelfAddr get local address
 func (s *Session) SelfAddr() string {
 	return s.conn.SelfAddr()
 }
 
+// PeerAddr get remote address
 func (s *Session) PeerAddr() string {
 	return s.conn.PeerAddr()
 }
 
+// SystemId get the system ID of current connection
 func (s *Session) SystemId() string {
 	return s.conn.SystemId()
 }
 
+// BindType get the bind type of current connection
 func (s *Session) BindType() pdu.BindingType {
 	return s.conn.BindType()
 }
 
+// InitAt the time of creating this session
 func (s *Session) InitAt() time.Time {
 	return s.initAt
 }
 
+// DialAt the time of creating current connection, this time will
+// be reset when the connection is reconnected each time
 func (s *Session) DialAt() time.Time {
 	return s.term.dialAt
 }
 
+// GetWindow get the window of current SMPP connection
 func (s *Session) GetWindow() Window {
 	return s.term.window
 }
 
+// GetContext get the session context
 func (s *Session) GetContext() any {
 	return s.conf.Context
 }
 
+// SetContext set the session context
 func (s *Session) SetContext(ctx any) {
 	s.conf.Context = ctx
 }
 
+// Write send a PDU to peer terminal, the data is user-custom data for trace the PDU request, you
+// can fetch this data exactly as it is by Response.TraceData() when you receive the PDU response
 func (s *Session) Write(p pdu.PDU, data any) error {
 	if s.connClosed() {
 		return ErrConnectionClosed
@@ -587,11 +600,16 @@ func (s *Session) Write(p pdu.PDU, data any) error {
 	return err
 }
 
+// Close close this session completely, this session will not reconnect after Close()
 func (s *Session) Close() {
 	atomic.StoreInt32(&s.closed, 1)
 	s.close(CloseByExplicit, "")
 }
 
+// Status get the session status
+// SessionActive:  this session's connection is active
+// SessionClosed:  this session has been closed completely
+// SessionDialing: this session is retrying to reconnect
 func (s *Session) Status() string {
 	if s.Closed() {
 		return SessionClosed
@@ -602,10 +620,12 @@ func (s *Session) Status() string {
 	return SessionActive
 }
 
+// IsActive is this session's connection active
 func (s *Session) IsActive() bool {
 	return s.connDialed()
 }
 
+// Closed has the session been completely closed
 func (s *Session) Closed() bool {
 	c1 := atomic.LoadInt32(&s.closed) == 1          // 显示关闭会话
 	c2 := s.conf.AttemptDial == 0 && s.connClosed() // 或连接已关闭并且没有开启重连

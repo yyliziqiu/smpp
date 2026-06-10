@@ -1,15 +1,6 @@
 package xcq
 
-import (
-	"errors"
-	"fmt"
-)
-
-var (
-	ErrEmptyQueue = errors.New("empty queue")
-	ErrOutOfRange = errors.New("index out of range")
-)
-
+// Queue recycle queue
 type Queue struct {
 	step int
 	list []any
@@ -24,12 +15,10 @@ func New(n int) *Queue {
 	}
 }
 
-// 获取队列容量
 func (q *Queue) cap() int {
 	return len(q.list)
 }
 
-// 获取队列长度
 func (q *Queue) len() int {
 	if q.tail > q.head {
 		return q.tail - q.head
@@ -40,50 +29,37 @@ func (q *Queue) len() int {
 	return 0
 }
 
-// 获取指定下标的前一个下标
 func (q *Queue) prev(i int) int {
 	return (i - 1 + q.cap()) % q.cap()
 }
 
-// 获取指定下标的后一个下标
 func (q *Queue) next(i int) int {
 	return (i + 1) % q.cap()
 }
 
-// 获取头下标的前一个下标
 func (q *Queue) headprev() int {
 	return q.prev(q.head)
 }
 
-// 获取头下标的后一个下标
 func (q *Queue) headnext() int {
 	return q.next(q.head)
 }
 
-// 获取尾下标的前一个下标
 func (q *Queue) tailprev() int {
 	return q.prev(q.tail)
 }
 
-// 获取尾下标的后一个下标
 func (q *Queue) tailnext() int {
 	return q.next(q.tail)
 }
 
-// 从队列尾向队列中添加一个元素
 func (q *Queue) push(item any) {
-	// 若队列已满，则扩容
 	if q.tailnext() == q.head {
 		q.grow()
 	}
 
-	// 添加元素
 	q.list[q.tail] = item
 	q.tail = q.tailnext()
-}
-
-func (q *Queue) status() string {
-	return fmt.Sprintf("%2d - %-2d, %2d / %-2d", q.head, q.tail, q.len(), q.cap())
 }
 
 func (q *Queue) grow() {
@@ -99,14 +75,11 @@ func (q *Queue) grow() {
 	q.tail = j
 }
 
-// 从队列头弹出一个元素
 func (q *Queue) pop() (any, bool) {
-	// 判断是否为空
 	if q.empty() {
 		return nil, false
 	}
 
-	// 弹出元素
 	item := q.list[q.head]
 	q.list[q.head] = nil
 	q.head = q.headnext()
@@ -118,46 +91,24 @@ func (q *Queue) empty() bool {
 	return q.head == q.tail
 }
 
-// 获取指定下标元素
-func (q *Queue) get(i int) (any, error) {
-	if q.empty() {
-		return nil, ErrEmptyQueue
-	}
-	if !q.valid(i) {
-		return nil, ErrOutOfRange
-	}
-	return q.list[i], nil
+func (q *Queue) Push(item any) {
+	q.push(item)
 }
 
-func (q *Queue) valid(i int) bool {
-	if q.head < q.tail {
-		return i >= q.head && i < q.tail
-	}
-	if q.head > q.tail {
-		return i >= q.head || i < q.tail
-	}
-	return false
+func (q *Queue) Pop() (any, bool) {
+	return q.pop()
 }
 
-// 重置队列
-func (q *Queue) reset(data []any) {
-	initCap := (len(data)/q.step+1)*q.step + 1
+type Check func(item any) bool
 
-	list := make([]any, initCap)
-	for i, item := range data {
-		list[i] = item
+func (q *Queue) Pops(check Check) {
+	for q.head != q.tail {
+		item := q.list[q.head]
+		ok := check(item)
+		if !ok {
+			break
+		}
+		q.list[q.head] = nil
+		q.head = q.headnext()
 	}
-
-	q.list = list
-	q.head = 0
-	q.tail = len(data)
-}
-
-// 复制列表
-func (q *Queue) copyList() []any {
-	cpy := make([]any, 0, q.len())
-	for i := q.head; i != q.tail; i = q.next(i) {
-		cpy = append(cpy, q.list[i])
-	}
-	return cpy
 }

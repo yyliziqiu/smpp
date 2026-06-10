@@ -201,7 +201,7 @@ func (w *LargeWindow) TakeTimeout() []*Request {
 	list := make([]*Request, 0, 16)
 
 	w.mu.Lock()
-	w.queue.Pops2(func(item any) bool {
+	w.queue.Pops(func(item any) bool {
 		value := item.(*LargeWindowValue)
 		if value.Request == nil {
 			return true
