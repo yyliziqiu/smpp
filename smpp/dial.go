@@ -27,8 +27,8 @@ func TlsDial(domain string, timeout time.Duration) Dial {
 		}
 
 		cli := tls.Client(conn, &tls.Config{
-			InsecureSkipVerify: domain == "",
 			ServerName:         domain,
+			InsecureSkipVerify: domain == "",
 		})
 
 		if err = cli.Handshake(); err != nil {
