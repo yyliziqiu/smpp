@@ -492,10 +492,10 @@ func (s *Session) pushRequest(submitter int8, p pdu.PDU, data any) {
 func (s *Session) newRequest(submitter int8, p pdu.PDU, data any) *Request {
 	return &Request{
 		Pdu:       p,
-		TraceData: data,
 		SessionId: s.id,
 		SystemId:  s.conn.SystemId(),
 		SubmitAt:  0,
+		TraceData: data,
 		submitter: submitter,
 	}
 }
