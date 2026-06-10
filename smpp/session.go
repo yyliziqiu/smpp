@@ -55,20 +55,20 @@ type SessionTerm struct {
 }
 
 type SessionConfig struct {
-	Context     any
-	EnquireLink time.Duration                   // 心跳间隔
-	AttemptDial time.Duration                   // 重连间隔
-	WindowType  int                             // 窗口类型，WindowWait 小或 WindowSize 大时建议为1
-	WindowSize  int                             // 窗口大小
-	WindowWait  time.Duration                   // 超时时间
-	WindowScan  time.Duration                   // 清理窗口内超时请求的时间间隔
-	WindowBlock time.Duration                   // 当窗口满时写操作的阻塞时间，0表示不阻塞返回错误，大于0表示阻塞时间，小于0表示挂起当前协程等待下次调度
-	WindowNewer func(*Session) Window           // 自定义窗口
-	OnDialed    func(*Session)                  // 连接成功时执行
-	OnClosed    func(*Session, string, string)  // 关闭会话时执行
-	OnReceive   func(*Session, pdu.PDU) pdu.PDU // 接收到对端非响应 pdu 时执行
-	OnRequest   func(*Session, *Request)        // 向对端提交 pdu 时执行
-	OnRespond   func(*Session, *Response)       // 接收到对端 pdu 响应时执行，此响应为 OnRequest 提交的 pdu 的响应
+	Context     any                             // user custom data
+	EnquireLink time.Duration                   // heart beat interval
+	AttemptDial time.Duration                   // reconnection waiting time
+	WindowType  int                             // SMPP window type
+	WindowSize  int                             // SMPP window size
+	WindowWait  time.Duration                   // the timeout duration of request in the window
+	WindowScan  time.Duration                   // clearing window interval
+	WindowBlock time.Duration                   // block behavior when window is full. 0: return error immediately, >0: sleep WindowBlock duration, <0: hang up and wait next goroutine schedule
+	WindowNewer func(*Session) Window           // set custom window
+	OnDialed    func(*Session)                  // invoked when connection is established
+	OnClosed    func(*Session, string, string)  // invoked when session is closed completely
+	OnReceive   func(*Session, pdu.PDU) pdu.PDU // invoked when received a non-responsive PDU form peer terminal
+	OnRequest   func(*Session, *Request)        // invoked when submitted a PDU
+	OnRespond   func(*Session, *Response)       // invoked when received a responsive PDU of submitted PDU
 }
 
 func NewSession(conn Connection, cfg SessionConfig) (*Session, error) {
