@@ -57,11 +57,17 @@ func (t *Receipt) String() string {
 }
 
 func (t *Receipt) DeliverSm(source string, dest string, message pdu.ShortMessage) *pdu.DeliverSM {
+	// 创建回执消息
 	p := pdu.NewDeliverSM().(*pdu.DeliverSM)
 	p.SourceAddr = Address(1, 1, source)
 	p.DestAddr = Address(5, 0, dest)
+
+	// 设置回执标志
 	p.EsmClass = data.SM_SMSC_DLV_RCPT_TYPE
+
+	// 填充消息内容
 	p.Message = message
+
 	return p
 }
 
